@@ -22,6 +22,7 @@ They should be organized like this: `/Category/Server('any' if server is not imp
 
 ### Submit a PR(Pull request)
 ![image](https://github.com/user-attachments/assets/4c37bc1b-afb2-418d-a1d2-bd40215e6a3d)  
-![image](https://github.com/user-attachments/assets/bdfec29b-f6bb-4cdd-b5b0-f4eb946c4e2b)
+
+Follow the insctructions from there.  
 
 ### Someone will review your script and approve/deny/request changes
