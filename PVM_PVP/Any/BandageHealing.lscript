@@ -1,0 +1,10 @@
+while 'true'
+  if timerexpired 'bandheal1'
+    if 'hits' < 'maxhits' or poisoned
+      bandageself
+      waitfortarget 0
+      target 'self'
+      settimer 'bandheal1' '6500'
+    endif
+  endif
+endwhile
