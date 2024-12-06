@@ -1,0 +1,27 @@
+sysmsg 'Target a forge'
+promptalias 'forge'
+
+if not findobject 'forge'
+    sysmsg 'Unable to find your forge'
+    stop
+endif
+
+removelist 'ores'
+createlist 'ores'
+
+pushlist 'ores' '0x19B8'
+pushlist 'ores' '0x19B7'
+pushlist 'ores' '0x19B9'
+pushlist 'ores' '0x19BA'
+
+while findtypelist 'ores' 'backpack'
+    useobject 'found' 'true'
+    waitfortarget
+    target 'forge'
+    pause 500
+    if injournal 'There is not enough metal'
+        moveitemoffset 'found' '1' '1' '0' '0'
+        clearjournal
+        pause 500
+    endif
+endwhile
