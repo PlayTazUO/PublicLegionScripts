@@ -1,0 +1,13 @@
+removelist 'tools'
+createlist 'tools'
+pushlist 'tools' '0x0E86' //Pickaxe
+pushlist 'tools' '0x0F39' //Shovel
+
+foreach 'tool' in 'tools'
+    while findtype 'tool' 'backpack'
+        useobject 'found' 'true'
+        waitfortarget '0' '7000'
+        targettilerel '0' '0'
+        pause '1500' //Adjust delay here
+    endif
+endfor
