@@ -9,5 +9,5 @@ foreach 'tool' in 'tools'
         waitfortarget '0' '7000'
         targettilerel '0' '0'
         pause '1500' //Adjust delay here
-    endif
+    endwhile
 endfor
