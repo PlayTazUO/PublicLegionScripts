@@ -2,7 +2,7 @@
 setalias 'lastenemy' '0'
 
 while 'true'
-    if dead 'lastenemy'
+    if dead 'lastenemy' or distance 'lastenemy' > 7
         if nearesthostile '7'
             setalias 'lastenemy' 'found'
             attack 'found'
