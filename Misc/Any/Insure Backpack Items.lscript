@@ -1,0 +1,21 @@
+//A simple script to check and insure items in your backpack.
+
+clearignorelist
+headmsg 'self' 'Checking for insured items'
+
+contextmenu 'self' '6'
+waitfortarget '0' '10000'
+
+while findtype '0' 'backpack' > 0
+    getproperties 'found'
+
+    if not property 'found' 'Insured'
+        waitfortarget '0' '10000'
+        target 'found'
+        pause '500'
+    endif
+
+    ignoreobject 'found'
+endwhile
+
+canceltarget
