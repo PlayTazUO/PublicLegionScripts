@@ -1,0 +1,21 @@
+if pathfinding
+    cancelpathfind
+endif
+
+goto '10'
+while pathfinding
+    pause 500
+endwhile
+return
+
+pathfind '2562' '493' '0'
+goto '5'
+
+pathfind '2567' '485' '0'
+goto '5'
+
+pathfind '2575' '477' '0'
+goto '5'
+
+headmsg 'self' 'Made it!'
+stop
