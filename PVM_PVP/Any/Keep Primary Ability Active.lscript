@@ -1,0 +1,6 @@
+# Keep your primary ability active if you have at least 50 mana
+if not primaryabilityactive and mana >= 50
+    useprimaryability
+endif
+pause 1000
+replay
