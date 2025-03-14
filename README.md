@@ -1,6 +1,6 @@
 # PublicLegionScripts
 Publicly available scripts for the Legion Scripting Engine  
-These scripts are made for the [TazUO](https://github.com/jsebold666/TazUO) Ultima Online client.  
+These scripts are made for the [TazUO](https://github.com/bittiez/TazUO) Ultima Online client.  
 
 You can use our [VSCode extension](https://marketplace.visualstudio.com/items?itemName=TazmanianTad.legionscript) to make writing scripts easier.
 
