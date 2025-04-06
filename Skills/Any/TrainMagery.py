@@ -10,6 +10,7 @@ import time
 # --- SETTINGS ---
 resistTrain = True # Use spells that will train your resist
 useMeditation = True
+meditationDelay = 10 # Delay between meditation uses
 # --- END SETTINGS ---
 
 
@@ -26,9 +27,9 @@ def manaCheck():
     
     if Player.Mana < 40:
         while Player.Mana < Player.ManaMax:
-            if (not API.BuffExists('Meditation') and useMeditation and nextMeditation >= time.time()):
+            if (not API.BuffExists('Meditation') and useMeditation and time.time() >= nextMeditation):
                 API.UseSkill('Meditation')
-                nextMeditation = time.time()
+                nextMeditation = time.time() + meditationDelay
             API.Pause(0.2)
 
 def trainMage():
