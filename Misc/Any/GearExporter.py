@@ -5,22 +5,31 @@ import re
 
 # List of layer names
 layer_names = [
-    "OneHanded","TwoHanded","Shoes",
-    "Pants","Shirt","Helmet",
-    "Gloves","Ring","Talisman",
-    "Necklace","Waist","Torso",
-    "Bracelet","Tunic","Earrings",
-    "Arms","Cloak","Robe",
-    "Skirt","Legs"
+    "OneHanded", "TwoHanded", "Shoes",
+    "Pants", "Shirt", "Helmet",
+    "Gloves", "Ring", "Talisman",
+    "Necklace", "Waist", "Torso",
+    "Bracelet", "Tunic", "Earrings",
+    "Arms", "Cloak", "Robe",
+    "Skirt", "Legs"
 ]
 
-ignore = ["Strength Requirement", "Durability", "Self Repair"]
+ignore = ["Strength Requirement", "Durability", "Self Repair", "Artifact Rarity"]
 
 # Dictionary to store layer items and their properties
 layer_item_properties = {}
 
 # Dictionary to store combined properties
 combined_properties = {}
+
+# Resist attributes group
+resist_attributes = {}
+
+# Plus attributes group
+plus_attributes = {}
+
+# Bonus attributes group
+bonus_attributes = {}
 
 # Iterate through each layer
 for layer in layer_names:
@@ -64,7 +73,24 @@ for layer in layer_names:
                 "Properties": props_dict
             }
 
-w = 550
+# Group resist, plus, and bonus attributes
+for name, value in combined_properties.items():
+    if "Resist" in name:
+        resist_attributes[name] = value
+    elif "+" in name:
+        plus_attributes[name] = value
+    elif "bonus" in name.lower():  # Grouping attributes that contain the word "bonus"
+        bonus_attributes[name] = value
+    else:
+        combined_properties[name] = value
+
+# Sort resist attributes, plus attributes, and bonus attributes alphabetically
+sorted_resist_attributes = sorted(resist_attributes.keys())
+sorted_plus_attributes = sorted(plus_attributes.keys())
+sorted_bonus_attributes = sorted(bonus_attributes.keys())
+
+# Create gump
+w = 575
 h = 0
 
 gump = API.CreateGump(True, True)
@@ -72,39 +98,153 @@ gump = API.CreateGump(True, True)
 bg = API.CreateGumpColorBox(0.4, "#D4202020")
 gump.Add(bg)
 
-output = "Attribute,Value,Value2\n"
+output = "Attribute\tValue\tValue2\n"
 y = 15
-for name, value in combined_properties.items():
+
+# Display resist attributes first
+for name in sorted_resist_attributes:
+    value = resist_attributes[name]
     n = API.CreateGumpLabel(name)
     n.SetY(y)
     n.SetX(15)
     gump.Add(n)
     h = 22 + y
-        
-    output += f"{name},"
+
+    output += f"{name}\t"
     if isinstance(value, tuple):
-        output += f"{value[0]},{value[1]}"
+        output += f"{value[0]}\t{value[1]}"
         v1 = API.CreateGumpLabel(str(value[0]), 44)
         v1.SetX(165)
         v1.SetY(y)
         gump.Add(v1)
-        
+
         v2 = API.CreateGumpLabel(str(value[1]), 54)
         v2.SetX(215)
         v2.SetY(y)
         gump.Add(v2)
-        
     else:
-        output += str(value) + ","
+        output += str(value) + "\t"
         v1 = API.CreateGumpLabel(str(value), 44)
         v1.SetX(165)
         v1.SetY(y)
         gump.Add(v1)
+
     output += "\n"
     y += 22
 
+# Add an empty line (space) after resist attributes
+y += 22  # Increase y value by 22 to add a gap
 
-textbox = API.CreateGumpTextBox(output, 235, h - 15, True)
+# Also add an empty line to the output string for the text box
+output += "\n"  # Add an empty line after resist attributes
+
+# Display plus attributes
+for name in sorted_plus_attributes:
+    value = plus_attributes[name]
+    n = API.CreateGumpLabel(name)
+    n.SetY(y)
+    n.SetX(15)
+    gump.Add(n)
+    h = 22 + y
+
+    output += f"{name}\t"
+    if isinstance(value, tuple):
+        output += f"{value[0]}\t{value[1]}"
+        v1 = API.CreateGumpLabel(str(value[0]), 44)
+        v1.SetX(165)
+        v1.SetY(y)
+        gump.Add(v1)
+
+        v2 = API.CreateGumpLabel(str(value[1]), 54)
+        v2.SetX(215)
+        v2.SetY(y)
+        gump.Add(v2)
+    else:
+        output += str(value) + "\t"
+        v1 = API.CreateGumpLabel(str(value), 44)
+        v1.SetX(165)
+        v1.SetY(y)
+        gump.Add(v1)
+
+    output += "\n"
+    y += 22
+
+# Add an empty line (space) after plus attributes
+y += 22  # Increase y value by 22 to add a gap
+
+# Also add an empty line to the output string for the text box
+output += "\n"  # Add an empty line after plus attributes
+
+# Display bonus attributes
+for name in sorted_bonus_attributes:
+    value = bonus_attributes[name]
+    n = API.CreateGumpLabel(name)
+    n.SetY(y)
+    n.SetX(15)
+    gump.Add(n)
+    h = 22 + y
+
+    output += f"{name}\t"
+    if isinstance(value, tuple):
+        output += f"{value[0]}\t{value[1]}"
+        v1 = API.CreateGumpLabel(str(value[0]), 44)
+        v1.SetX(165)
+        v1.SetY(y)
+        gump.Add(v1)
+
+        v2 = API.CreateGumpLabel(str(value[1]), 54)
+        v2.SetX(215)
+        v2.SetY(y)
+        gump.Add(v2)
+    else:
+        output += str(value) + "\t"
+        v1 = API.CreateGumpLabel(str(value), 44)
+        v1.SetX(165)
+        v1.SetY(y)
+        gump.Add(v1)
+
+    output += "\n"
+    y += 22
+
+# Add an empty line (space) after bonus attributes
+y += 22  # Increase y value by 22 to add a gap
+
+# Also add an empty line to the output string for the text box
+output += "\n"  # Add an empty line after bonus attributes
+
+# Display other attributes
+for name in sorted(combined_properties.keys()):
+    if name not in resist_attributes and name not in plus_attributes and name not in bonus_attributes:
+        value = combined_properties[name]
+        n = API.CreateGumpLabel(name)
+        n.SetY(y)
+        n.SetX(15)
+        gump.Add(n)
+        h = 22 + y
+
+        output += f"{name}\t"
+        if isinstance(value, tuple):
+            output += f"{value[0]}\t{value[1]}"
+            v1 = API.CreateGumpLabel(str(value[0]), 44)
+            v1.SetX(165)
+            v1.SetY(y)
+            gump.Add(v1)
+
+            v2 = API.CreateGumpLabel(str(value[1]), 54)
+            v2.SetX(215)
+            v2.SetY(y)
+            gump.Add(v2)
+        else:
+            output += str(value) + "\t"
+            v1 = API.CreateGumpLabel(str(value), 44)
+            v1.SetX(165)
+            v1.SetY(y)
+            gump.Add(v1)
+
+        output += "\n"
+        y += 22
+
+textbox = API.CreateGumpTextBox(output, 255, h - 15, True)
 textbox.SetX(300)
 textbox.SetY(15)
 gump.Add(textbox)
