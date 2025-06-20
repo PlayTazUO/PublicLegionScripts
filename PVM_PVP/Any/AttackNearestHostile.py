@@ -3,7 +3,7 @@
 import API
 
 # Adjust these settings as desired
-MAX_DISTANCE = 10
+MAX_DISTANCE = 5
 SHOW_RADIUS_INDICATOR = True
 # End user settings.
 
@@ -38,15 +38,17 @@ def pause():
     enabled = not enabled
     playbutton.SetText("[PAUSE]" if enabled else "[UN-PAUSE]")
     playbutton.SetBackgroundHue(172 if enabled else 53)
+    API.DisplayRange(0)
 
 def Honor(mob):
     global lastHonored
     if mob:
-        if mob.Serial != lastHonored and mob.HitsDiff == 0:
+        if mob.Serial != lastHonored and mob.HitsDiff == 0 and mob.Distance < 6:
             API.Virtue("honor")
             API.WaitForTarget()
             API.Target(mob)
             lastHonored = mob.Serial
+            API.CancelTarget()
 
 gump = API.CreateGump()
 gump.SetRect(100, 100, 400, 150)
@@ -101,7 +103,7 @@ while True:
         continue
 
     if SHOW_RADIUS_INDICATOR:
-        API.DisplayRange(10, 32)    
+        API.DisplayRange(MAX_DISTANCE, 32)    
     enemy = API.NearestMobile([API.Notoriety.Gray, API.Notoriety.Criminal, API.Notoriety.Murderer], MAX_DISTANCE)
     if enemy:
         if SHOW_RADIUS_INDICATOR:
@@ -111,6 +113,8 @@ while True:
             API.AutoFollow(enemy)
 
         while enemy and not enemy.IsDead and enemy.Distance < MAX_DISTANCE:
+            if not enabled:
+                break
             API.ProcessCallbacks()
             API.Attack(enemy)
             enemy.Hue = 32
