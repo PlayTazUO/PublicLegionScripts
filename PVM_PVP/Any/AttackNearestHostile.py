@@ -3,7 +3,7 @@
 import API
 
 # Adjust these settings as desired
-MAX_DISTANCE = 5
+MAX_DISTANCE = 10
 SHOW_RADIUS_INDICATOR = True
 # End user settings.
 
@@ -11,6 +11,9 @@ auto_follow = False
 lastHonored = 0
 enabled = False
 honorTargets = True
+newTarget = False
+enableAbility = True
+lastGroup = 0
 
 def enable_follow():
     global auto_follow
@@ -33,6 +36,14 @@ def disable_honor():
     global honorTargets
     honorTargets = False
 
+def enable_ability():
+    global enableAbility
+    enableAbility = True
+
+def disable_ability():
+    global enableAbility
+    enableAbility = False
+
 def pause():
     global enabled
     enabled = not enabled
@@ -50,47 +61,63 @@ def Honor(mob):
             lastHonored = mob.Serial
             API.CancelTarget()
 
+def new_target():
+    global newTarget
+    newTarget = True
+
+def useAbility():
+    if not enableAbility:
+        return
+    if API.Player.ManaDiff < 10 and not API.PrimaryAbilityActive():
+        API.ToggleAbility("primary")
+
+def createEnableDisable(text, onEnable, onDisable, gump, x, y, firstChecked):
+    global lastGroup
+    label = API.CreateGumpTTFLabel(text, 16, "#FFFFFF", aligned="right", maxWidth=98)
+    label.SetPos(x, y)
+    gump.Add(label)
+
+    button = API.CreateGumpRadioButton("Enable", lastGroup)
+    button.IsChecked = firstChecked
+    button.SetRect(x + 100, y, 100, 50)
+    API.AddControlOnClick(button, onEnable)
+    gump.Add(button)
+
+    button2 = API.CreateGumpRadioButton("Disable", lastGroup)
+    button2.IsChecked = not firstChecked
+    button2.SetRect(x + 200, y, 100, 50)
+    API.AddControlOnClick(button2, onDisable)
+    gump.Add(button2)
+    lastGroup += 1
+
 gump = API.CreateGump()
-gump.SetRect(100, 100, 400, 150)
-bg = API.CreateGumpColorBox(0.7, "#212121")
-bg.SetRect(0, 0, 400, 150)
+gump.SetRect(100, 100, 400, 175)
+bg = API.CreateGumpColorBox(0.7, "#212121").SetRect(0, 0, 400, 175)
 gump.Add(bg)
 label = API.CreateGumpTTFLabel("AutoAttack Script", 24, "#FF8800", aligned="center", maxWidth=400)
 gump.Add(label)
 
-button1 = API.CreateGumpRadioButton("Enable auto follow")
-button1.SetRect(25, 50, 100, 50)
-gump.Add(button1)
-API.AddControlOnClick(button1, enable_follow)
-
-button2 = API.CreateGumpRadioButton("Disable auto follow")
-button2.IsChecked = True
-button2.SetRect(200, 50, 100, 50)
-gump.Add(button2)
-API.AddControlOnClick(button2, disable_follow)
-
-honorOn = API.CreateGumpRadioButton("Enable honor targets", 1)
-honorOn.IsChecked = True
-honorOn.SetRect(25, 75, 100, 50)
-gump.Add(honorOn)
-API.AddControlOnClick(honorOn, enable_honor)
-
-honorOff = API.CreateGumpRadioButton("Disable honor targets", 1)
-honorOff.SetRect(200, 75, 100, 50)
-gump.Add(honorOff)
-API.AddControlOnClick(honorOff, disable_honor)
+createEnableDisable("Auto Follow", enable_follow, disable_follow, gump, 25, 50, auto_follow)
+createEnableDisable("Honor Targets", enable_honor, disable_honor, gump, 25, 75, honorTargets)
+createEnableDisable("Use Abilities", enable_ability, disable_ability, gump, 25, 100, enableAbility)
 
 stopbutton = API.CreateSimpleButton("[STOP]", 100, 25)
-stopbutton.SetPos(100, 100)
+stopbutton.SetPos(100, 125)
 stopbutton.SetBackgroundHue(32)
 gump.Add(stopbutton)
 API.AddControlOnClick(stopbutton, stop)
 
 playbutton = API.CreateSimpleButton("[UN-PAUSE]", 100, 25)
 playbutton.SetBackgroundHue(53)
-playbutton.SetPos(200, 100)
+playbutton.SetPos(200, 125)
 gump.Add(playbutton)
 API.AddControlOnClick(playbutton, pause)
+
+targButton = API.CreateSimpleButton("[NEW TARGET]", 100, 25)
+targButton.SetPos(150, 150)
+targButton.SetBackgroundHue(12)
+gump.Add(targButton)
+API.AddControlOnClick(targButton, new_target)
 
 
 API.AddGump(gump)
@@ -105,7 +132,9 @@ while True:
     if SHOW_RADIUS_INDICATOR:
         API.DisplayRange(MAX_DISTANCE, 32)    
     enemy = API.NearestMobile([API.Notoriety.Gray, API.Notoriety.Criminal, API.Notoriety.Murderer], MAX_DISTANCE)
+
     if enemy:
+        enemy_serial = enemy.Serial
         if SHOW_RADIUS_INDICATOR:
             API.DisplayRange(0)
 
@@ -115,12 +144,17 @@ while True:
         while enemy and not enemy.IsDead and enemy.Distance < MAX_DISTANCE:
             if not enabled:
                 break
+            if newTarget:
+                newTarget = False
+                break
             API.ProcessCallbacks()
             API.Attack(enemy)
             enemy.Hue = 32
             if honorTargets:
                 Honor(enemy)
+            useAbility()
             API.Pause(0.5)
-            enemy = API.NearestMobile([API.Notoriety.Gray, API.Notoriety.Criminal, API.Notoriety.Murderer], MAX_DISTANCE)
+            enemy = API.FindMobile(enemy_serial)
+            #enemy = API.NearestMobile([API.Notoriety.Gray, API.Notoriety.Criminal, API.Notoriety.Murderer], MAX_DISTANCE)
         
     API.Pause(0.5)
