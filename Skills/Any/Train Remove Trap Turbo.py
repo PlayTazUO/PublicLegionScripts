@@ -415,7 +415,7 @@ def play_game(gump_id, size, trap_serial, ui):
                 ui.updateBox(currentbox, 68, "")
 
                 #Check if the step is valid. Expected result should be always valid.
-                if attempt == (MoveResult.WrongTry or MoveResult.SomethingWentWrong):
+                if attempt == MoveResult.WrongTry or attempt == MoveResult.SomethingWentWrong:
                     ui.updateBox(currentbox, 1000, "")
                     currentbox = currentbox - dir_to_box(TryDirection)
                     API.SysMsg("The found solution is not valid!!", 33)
