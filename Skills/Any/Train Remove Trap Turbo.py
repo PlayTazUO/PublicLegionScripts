@@ -16,11 +16,10 @@
 # Script by ThomasThorun(https://github.com/ThomasThorun). The Turbo Solver was SimonSoft (https://github.com/caporalesimone/) idea.
 
 # Translated to TazUO Iron Python/GUI by Daennabis. Most of the code remains the same with minor changes for python.
-# Solver seems faster now.
 
 import API
 import re
-#import os
+#import os #This is leftover from the unknown solution importer
 import time
 import sys #for debug
 
@@ -53,7 +52,7 @@ class CircuitUI:
         self.gump1.SetWidth(w)  
         self.gump1.SetHeight(h)  
 
-        bg = API.CreateGumpColorBox(.25, "#575757FF")  
+        bg = API.CreateGumpColorBox(0, "#575757FF")  
         bg.SetWidth(w)  
         bg.SetHeight(h)  
         self.gump1.SetX(gump.GetX())
@@ -77,7 +76,7 @@ class CircuitUI:
                 box.Hue = 1
                 self.boxlist.append(box)
                 self.gump1.Add(self.boxlist[x+y*5])
-                text = API.CreateGumpTTFLabel("?", 24, "#FFFFFF", "alagard",)
+                text = API.CreateGumpTTFLabel("?", 24, "#FFFFFF", "alagard")
                 text.SetX(119 + x*40)
                 text.SetY(138 + y*40)
                 self.textlist.append(text)
@@ -98,52 +97,62 @@ class CircuitUI:
         titlebox.SetY(20)
         self.gump1.Add(titlebox)
 
-        title1 = API.CreateGumpTTFLabel("Remove Trap", 24, "#FFFFFF", "alagard",)
+        title1 = API.CreateGumpTTFLabel("Remove Trap", 24, "#FFFFFF", "alagard")
         title1.SetX(355)
         title1.SetY(25)
         self.gump1.Add(title1)
 
-        title2 = API.CreateGumpTTFLabel("Turbo Trainer", 18, "#FFFFFF", "avadonian",)
+        title2 = API.CreateGumpTTFLabel("Turbo Trainer", 18, "#FFFFFF", "avadonian")
         title2.SetX(420)
         title2.SetY(50)
         self.gump1.Add(title2)
 
-        self.l_size = API.CreateGumpTTFLabel("", 18, "#FFFFFF", "alagard",)
+        self.l_size = API.CreateGumpTTFLabel("", 18, "#FFFFFF", "alagard")
         self.l_size.SetX(365)
         self.l_size.SetY(75)
         self.gump1.Add(self.l_size)
 
-        self.l_attempt = API.CreateGumpTTFLabel("Attempt #:", 18, "#FFFFFF", "alagard",)
+        self.l_attempt = API.CreateGumpTTFLabel("Attempt #", 18, "#FFFFFF", "alagard")
         self.l_attempt.SetX(365)
         self.l_attempt.SetY(100)
         self.gump1.Add(self.l_attempt)
 
-        self.l_path = API.CreateGumpTTFLabel("Path:", 18, "#FFFFFF", "alagard",)
+        self.l_path = API.CreateGumpTTFLabel("Path:", 18, "#FFFFFF", "alagard")
         self.l_path.SetX(365)
         self.l_path.SetY(125)
         self.gump1.Add(self.l_path)
 
-        self.l_move = API.CreateGumpTTFLabel("Moving:", 18, "#FFFFFF", "alagard",)
+        self.l_move = API.CreateGumpTTFLabel("Moving:", 18, "#FFFFFF", "alagard")
         self.l_move.SetX(365)
         self.l_move.SetY(150)
         self.gump1.Add(self.l_move)
 
-        self.l_skill = API.CreateGumpTTFLabel("Skill:", 18, "#FFFFFF", "alagard",)
+        self.l_skill = API.CreateGumpTTFLabel("", 18, "#FFFFFF", "alagard") #Skill time remaining
         self.l_skill.SetX(365)
-        self.l_skill.SetY(175)
+        self.l_skill.SetY(200)
         self.gump1.Add(self.l_skill)
 
-        self.l_ttime = API.CreateGumpTTFLabel("Time Elapsed:", 18, "#FFFFFF", "alagard",)
+        self.skillbar = API.CreateGumpSimpleProgressBar(200, 5, "#666666", "#0059FF", int(API.GetSkill("Remove Trap").Value), int(API.GetSkill("Remove Trap").Cap))
+        self.skillbar.SetX(365)
+        self.skillbar.SetY(220)
+        self.gump1.Add(self.skillbar)
+
+        self.l_skillfraction = API.CreateGumpTTFLabel(f"{float(API.GetSkill('Remove Trap').Value):.1f}" + "/" + str(API.GetSkill("Remove Trap").Cap), 18, "#FFFFFF", "alagard") 
+        self.l_skillfraction.SetX(425)
+        self.l_skillfraction.SetY(240)
+        self.gump1.Add(self.l_skillfraction)
+
+        self.l_ttime = API.CreateGumpTTFLabel("Time Elapsed:", 18, "#FFFFFF", "alagard")
         self.l_ttime.SetX(365)
         self.l_ttime.SetY(300)
         self.gump1.Add(self.l_ttime)
 
-        self.l_tdisarm = API.CreateGumpTTFLabel("Disarmed Trap #0 in 0s", 18, "#FFFFFF", "alagard",)
+        self.l_tdisarm = API.CreateGumpTTFLabel("Disarmed Trap #0 in 0s", 18, "#FFFFFF", "alagard")
         self.l_tdisarm.SetX(365)
         self.l_tdisarm.SetY(325)
         self.gump1.Add(self.l_tdisarm)
 
-        self.l_mean = API.CreateGumpTTFLabel("Avg disarm time:", 18, "#FFFFFF", "alagard",)
+        self.l_mean = API.CreateGumpTTFLabel("Avg disarm time:", 18, "#FFFFFF", "alagard")
         self.l_mean.SetX(365)
         self.l_mean.SetY(350)
         self.gump1.Add(self.l_mean)
@@ -151,7 +160,7 @@ class CircuitUI:
         self.gump1.LayerOrder = self.gump1.LayerOrder.__class__.Over
         API.AddGump(self.gump1)
 
-    def updateBox(self, index, BHue=None, text=None, THue=None):
+    def updateBox(self, index, BHue=None, text=None, THue=None, BAlpha=None):
         """
         Updates Box and Text
         
@@ -167,8 +176,10 @@ class CircuitUI:
             self.textlist[index].SetText(text)
         if THue is not None:
             self.textlist[index].Hue = THue
+        if BAlpha is not None:
+            self.boxlist[index].Alpha = BAlpha
 
-    def updateText(self, size=None, attempt=None, path=None, move=None, skill=None, 
+    def updateText(self, size=None, attempt=None, path=None, move=None, skilltime=None, 
                    timeelapsed=None, disarm_count=None, disarm_time=None, mean=None):
         """
         Updates Box and Text
@@ -187,15 +198,17 @@ class CircuitUI:
         if size is not None:
             self.l_size.SetText(str(size) + "x" + str(size))
         if attempt is not None:
-            self.l_attempt.SetText("Attempt #: " + str(attempt))
+            self.l_attempt.SetText("Attempt #" + str(attempt))
         if path is not None:
             self.l_path.SetText("Path: " + str(path))
         if move is not None:
             self.l_move.SetText("Moving: " + str(move))
-        if skill is not None:
-            self.l_skill.SetText("Skill: " + str(skill))
+        if skilltime is not None:
+            h = round(float(skilltime) // 3600)
+            m = round((float(skilltime) % 3600) // 60)
+            s = round(float(skilltime) % 60)
+            self.l_skill.SetText("Time to Max: " + str(h) + "h " + str(m) + "m " + str(s) + "s")
         if timeelapsed is not None:
-            
             h = timeelapsed // 3600
             m = (timeelapsed % 3600) // 60
             s = timeelapsed % 60
@@ -204,12 +217,30 @@ class CircuitUI:
             self.l_tdisarm.SetText("Disarmed Trap #" + str(disarm_count) +" in " + str(disarm_time) + "s")
         if mean is not None:
             self.l_mean.SetText(f"Avg disarm time: {mean:.2f}s")
+        self.l_skillfraction.SetText(f"{float(API.GetSkill('Remove Trap').Value):.1f}" + "/" + str(API.GetSkill("Remove Trap").Cap))
+        self.skillbar.SetProgress(API.GetSkill("Remove Trap").Value, API.GetSkill("Remove Trap").Cap)
+        
 
 
 
-    def reset(self):
-        for i in range(25):
-            self.updateBox(i, BHue=1, text="?", THue = 931)
+
+    def reset(self, size):
+        if size == 5:
+            for i in range(25):
+                self.updateBox(i, BHue=1, text="?", THue = 931)
+        if size == 4:
+            for i in range(25):
+                self.updateBox(i, BHue=1, text="?", THue = 931)
+            for i in range(0, 5):
+                self.updateBox(20 + 1*i, None, "", BAlpha = 0)
+                self.updateBox(4 + 5*i, None, "", BAlpha = 0)
+        if size == 3:
+            for i in range(25):
+                self.updateBox(i, BHue=1, text="?", THue = 931)
+            for i in range(0, 5):
+                for i2 in range (0, 2):
+                    self.updateBox(15 + 5*i2 + 1*i, None, "", BAlpha = 0)
+                    self.updateBox(3 + 1*i2 + 5*i, None, "", BAlpha = 0)
 
 # Solutions
 known_solutions_3x3 = [
@@ -308,7 +339,7 @@ def wait_for_remove_trap_gump():
         current_time = time.time()
         gump_id = API.HasGump()  #Grab the first gump
         if API.GumpContains("Trap", gump_id): #verify this is trap gump
-            API.SysMsg("Gump found: " + str(gump_id))
+            if DEBUG: API.SysMsg("Gump found: " + str(gump_id))
             return gump_id
         if current_time - trap_open_time > 5:   # Timer to break loop
             API.SysMsg("Gump not found.", 33)
@@ -335,8 +366,23 @@ def play_game(gump_id, size, trap_serial, ui):
     path = []
     failedDirections = []
     currentbox = 0
-    ui.updateBox(currentbox, 69, "S", 1)
-    ui.updateBox(24, 69, "E", 1)
+    
+    if size == 5:
+        ui.updateBox(currentbox, 69, "S", 1)
+        ui.updateBox(24, 69, "E", 1)
+    if size == 4:
+        for i in range(0, 5):
+            ui.updateBox(20 + 1*i, None, "", BAlpha = 0)
+            ui.updateBox(4 + 5*i, None, "", BAlpha = 0)
+        ui.updateBox(currentbox, 69, "S", 1)
+        ui.updateBox(18, 69, "E", 1)
+    if size == 3:
+        for i in range(0, 5):
+            for i2 in range (0, 2):
+                ui.updateBox(15 + 5*i2 + 1*i, None, "", BAlpha = 0)
+                ui.updateBox(3 + 1*i2 + 5*i, None, "", BAlpha = 0)
+        ui.updateBox(currentbox, 69, "S", 1)
+        ui.updateBox(12, 69, "E", 1)
     attempt = MoveResult.ValidTry #First try is always valid/This shows the status of the current attempt
     TryDirection = Dir.Invalid
     for SafeCounter in range(0,50):
@@ -374,13 +420,13 @@ def play_game(gump_id, size, trap_serial, ui):
 
         pathString = dir_list_to_str(path)
         ui.updateText(path = pathString)
-        #API.SysMsg("Path: " + pathString + " | Next: " + dir_to_str(TryDirection), 149)
+        if DEBUG: API.SysMsg("Path: " + pathString + " | Next: " + dir_to_str(TryDirection), 149)
 
         if attempt == MoveResult.Disarmed:
             path.append(TryDirection)
             #if STORE_UNKNOWN_SOLUTIONS_ON_FILE == True: store_solution(size, path)
             currentbox = 0
-            ui.reset()
+            ui.reset(size)
             return True
         if attempt == MoveResult.WrongTry:
             if DEBUG: API.SysMsg("Wrong: " + dir_to_str(TryDirection), 149)
@@ -532,7 +578,8 @@ def run():
     ui = None
     counter = 0
     start_time = time.time()
-
+    starting_skill = API.GetSkill("Remove Trap").Value
+    skill_time_remaining = None
     while True:
         debug_here("",315)
         trap_time = time.time()
@@ -544,20 +591,22 @@ def run():
         size = calculate_trap_size(gump_id)
         if ui is None:
             ui = CircuitUI(gump_id)
-        ui.updateText(size = calculate_trap_size(gump_id))
+        ui.updateText(size = calculate_trap_size(gump_id)) # Clear unused squares
         play_game(gump_id, size, trap_serial, ui)
         
         elapsed = (time.time() - trap_time)
         total_time = (time.time() - start_time)
         
-        counter += 1
+        counter += 1    #Trap counter
         avg = round(total_time / counter, 2)
 
-        ui.updateText(None, None, None, None, None, int(total_time), counter, int(elapsed), avg)
-        # API.SysMsg("======================================", 149)
-        # API.SysMsg(f"Disarmed Trap #{counter:03} in {int(elapsed)} seconds", 149)
-        # API.SysMsg(f"Total elapsed time: {int(total_time)} seconds", 149)
-        # API.SysMsg(f"Average disarm time: {avg:.1f} seconds", 149)
-        # API.SysMsg("======================================", 149)
+        #Skill and skill rate calculations
+        current_skill = API.GetSkill("Remove Trap").Value
+        gain_rate = (current_skill - starting_skill) / int(total_time)
+        if gain_rate != 0:
+            skill_time_remaining = (API.GetSkill("Remove Trap").Cap - current_skill) / gain_rate
+
+
+        ui.updateText(None, None, None, None, skill_time_remaining, int(total_time), counter, int(elapsed), avg)
 
 run()
