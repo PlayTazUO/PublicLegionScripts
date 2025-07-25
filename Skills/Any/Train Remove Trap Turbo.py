@@ -428,15 +428,14 @@ def play_game(gump_id, size, trap_serial, ui):
                     if check == (MoveResult.WrongTry or MoveResult.SomethingWentWrong):
                         return False # Something went wrong
             TryDirection = next_direction(size, path, failedDirections)
-            if DEBUG: API.SysMsg("Try: " + dir_to_str(TryDirection), 149)
+            if DEBUG: API.SysMsg("Try: " + dir_to_str(TryDirection), 431)
 
             attempt = move_to(gump_id, TryDirection, ui)
             currentbox = currentbox + dir_to_box(TryDirection)
-            
 
         pathString = dir_list_to_str(path)
         ui.updateText(path = pathString)
-        if DEBUG: API.SysMsg("Path: " + pathString + " | Next: " + dir_to_str(TryDirection), 149)
+        if DEBUG: API.SysMsg("Path: " + pathString + " | Next: " + dir_to_str(TryDirection), 438)
 
         if attempt == MoveResult.Disarmed:
             path.append(TryDirection)
@@ -445,7 +444,7 @@ def play_game(gump_id, size, trap_serial, ui):
             ui.reset(size)
             return True
         if attempt == MoveResult.WrongTry:
-            if DEBUG: API.SysMsg("Wrong: " + dir_to_str(TryDirection), 149)
+            if DEBUG: API.SysMsg("Wrong: " + dir_to_str(TryDirection), 447)
             failedDirections.append(TryDirection)
             ui.updateBox(currentbox, 33, "X", 1)
             currentbox = currentbox - dir_to_box(TryDirection)
@@ -482,7 +481,7 @@ def move_to(gump_id, direction, ui):
     wait_for_remove_trap_gump()
 
     API.CloseGump(gump_id)
-    if DEBUG: API.SysMsg("Something went wrong. Line 229")
+    if DEBUG: API.SysMsg("Something went wrong. Line 484")
     return 3  # Something went wrong
 
 
@@ -621,7 +620,6 @@ def run():
         gain_rate = (current_skill - starting_skill) / int(total_time)
         if gain_rate != 0:
             skill_time_remaining = (API.GetSkill("Remove Trap").Cap - current_skill) / gain_rate
-
 
         ui.updateText(None, None, None, None, skill_time_remaining, int(total_time), counter, int(elapsed), avg)
 
