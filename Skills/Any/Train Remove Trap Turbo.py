@@ -23,6 +23,22 @@ import re
 import time
 import sys #for debug
 
+
+#######################################################################
+#                         USER OPTIONS                                #
+#######################################################################
+
+#pause will change the delay timer used to grab the trap gump,
+#if you are getting dc'd a lot from the script, make the value higher
+#pause is in secs so the default of .1 = a tenth of a second. 
+pause = .10 
+
+
+
+#######################################################################
+#######################################################################
+
+
 # SETUP AND KNOWN SOLUTIONS
 DEBUG = False
 STORE_UNKNOWN_SOLUTIONS_ON_FILE = False
@@ -344,7 +360,7 @@ def wait_for_remove_trap_gump():
         if current_time - trap_open_time > 5:   # Timer to break loop
             API.SysMsg("Gump not found.", 33)
             return 0
-        API.Pause(.10)
+        API.Pause(pause)
 
 
 def calculate_trap_size(gump_id):
