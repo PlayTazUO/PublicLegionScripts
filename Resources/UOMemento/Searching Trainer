@@ -4,5 +4,5 @@ import time
 while True:
     API.UseSkill("Searching")
     time.sleep(0.75)  # Wait 750ms before targeting
-    API.Target(0x0005A66D)
+    API.TargetSelf()
     time.sleep(7)     # Wait 7 seconds before next loop
