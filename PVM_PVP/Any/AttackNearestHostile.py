@@ -7,6 +7,10 @@ MAX_DISTANCE = 10
 SHOW_RADIUS_INDICATOR = True
 # End user settings.
 
+AFOLLOWSAVE = "aas_autofollow"
+HONORT = "aas_honortargets"
+ABILITUSE = "aas_abilityuse"
+
 auto_follow = False
 lastHonored = 0
 enabled = False
@@ -15,45 +19,78 @@ newTarget = False
 enableAbility = True
 lastGroup = 0
 
+def load_settings():
+    global auto_follow, honorTargets, enableAbility
+    af = API.GetPersistentVar(AFOLLOWSAVE, "False", API.PersistentVar.Char)
+    if af == "True":
+        auto_follow = True
+    
+    ht = API.GetPersistentVar(HONORT, "True", API.PersistentVar.Char)
+    if ht == "False":
+        honorTargets = False
+    
+    ub = API.GetPersistentVar(ABILITUSE, "True", API.PersistentVar.Char)
+    if ub == "False":
+        enableAbility = False
+
+def save_settings():
+    global auto_follow, honorTargets, enableAbility
+    API.SavePersistentVar(AFOLLOWSAVE, "True" if auto_follow else "False", API.PersistentVar.Char)
+    API.SavePersistentVar(HONORT, "True" if honorTargets else "False", API.PersistentVar.Char)
+    API.SavePersistentVar(ABILITUSE, "True" if enableAbility else "False", API.PersistentVar.Char)
+
+def stop():
+    API.SavePersistentVar("AAXY", f"{gump.GetX()},{gump.GetY()}", API.PersistentVar.Char)
+    save_settings()
+    API.DisplayRange(0)
+    gump.Dispose()
+    API.SetWarMode(False)
+    API.Stop()
+
 def enable_follow():
     global auto_follow
     auto_follow = True
+    save_settings()
     
 def disable_follow():
     global auto_follow
     auto_follow = False
-
-def stop():
-    API.DisplayRange(0)
-    gump.Dispose()
-    API.Stop()
+    save_settings()
 
 def enable_honor():
     global honorTargets
     honorTargets = True
+    save_settings()
 
 def disable_honor():
     global honorTargets
     honorTargets = False
+    save_settings()
 
 def enable_ability():
     global enableAbility
     enableAbility = True
+    save_settings()
 
 def disable_ability():
     global enableAbility
     enableAbility = False
+    save_settings()
 
 def pause():
     global enabled
     enabled = not enabled
-    playbutton.SetText("[PAUSE]" if enabled else "[UN-PAUSE]")
+    playbutton.SetText("[PLAYING]" if enabled else "[PAUSED]")
     playbutton.SetBackgroundHue(172 if enabled else 53)
     API.DisplayRange(0)
+    API.SetWarMode(enabled)
 
 def Honor(mob):
     global lastHonored
     if mob:
+        if API.HasTarget():
+            return
+        
         if mob.Serial != lastHonored and mob.HitsDiff == 0 and mob.Distance < 6:
             API.Virtue("honor")
             API.WaitForTarget()
@@ -90,8 +127,13 @@ def createEnableDisable(text, onEnable, onDisable, gump, x, y, firstChecked):
     gump.Add(button2)
     lastGroup += 1
 
+load_settings()
+
 gump = API.CreateGump()
-gump.SetRect(100, 100, 400, 175)
+savedX = API.GetPersistentVar("AAXY", "100,100", API.PersistentVar.Char)
+split = savedX.split(',')
+
+gump.SetRect(int(split[0]), int(split[1]), 400, 175)
 bg = API.CreateGumpColorBox(0.7, "#212121").SetRect(0, 0, 400, 175)
 gump.Add(bg)
 label = API.CreateGumpTTFLabel("AutoAttack Script", 24, "#FF8800", aligned="center", maxWidth=400)
@@ -99,7 +141,7 @@ gump.Add(label)
 
 createEnableDisable("Auto Follow", enable_follow, disable_follow, gump, 25, 50, auto_follow)
 createEnableDisable("Honor Targets", enable_honor, disable_honor, gump, 25, 75, honorTargets)
-createEnableDisable("Use Abilities", enable_ability, disable_ability, gump, 25, 100, enableAbility)
+createEnableDisable("Primary Abil", enable_ability, disable_ability, gump, 25, 100, enableAbility)
 
 stopbutton = API.CreateSimpleButton("[STOP]", 100, 25)
 stopbutton.SetPos(100, 125)
@@ -107,7 +149,7 @@ stopbutton.SetBackgroundHue(32)
 gump.Add(stopbutton)
 API.AddControlOnClick(stopbutton, stop)
 
-playbutton = API.CreateSimpleButton("[UN-PAUSE]", 100, 25)
+playbutton = API.CreateSimpleButton("[PAUSED]", 100, 25)
 playbutton.SetBackgroundHue(53)
 playbutton.SetPos(200, 125)
 gump.Add(playbutton)
