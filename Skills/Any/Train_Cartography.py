@@ -189,7 +189,7 @@ def main():
         if not restock_blank_scrolls():
             # Check if we have any scrolls in backpack as fallback
             backpack_scrolls = find_blank_scrolls_in_backpack()
-            if backpack_scrolls == 0:
+            if not backpack_scrolls or backpack_scrolls.Amount == 0:
                 API.SysMsg("No blank scrolls available in container or backpack!", 33)
                 break
         
