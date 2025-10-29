@@ -1,5 +1,0 @@
-# An example script to continue using hiding every 11 seconds.
-while 'true'
-  useskill 'hiding'
-  pause '11000'
-endwhile

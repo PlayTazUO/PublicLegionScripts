@@ -59,11 +59,6 @@ def get_nearby_chunks(x, y, radius, grid_size=8):
     # Always ensure the center chunk is included
     chunks.add((center_chunk_x, center_chunk_y))
     result = sorted(list(chunks))
-    # Debug print (remove or comment out if not needed)
-    try:
-        API.SysMsg(f"get_nearby_chunks({x},{y},{radius}) => {result}")
-    except Exception:
-        pass
     return result
 
 tool = None
@@ -104,7 +99,6 @@ else:
         for static in allStats:
             if (static.X, static.Y) in get_chunk_outline_tiles(chunk_x, chunk_y):
                 static.Hue = color
-    API.SysMsg(f"Outline tiles: {outline_tiles}, {len(outline_tiles)} total")
 
     API.UseObject(tool)
     API.WaitForTarget()
