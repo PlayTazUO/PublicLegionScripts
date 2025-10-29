@@ -1,10 +1,13 @@
 # Just hit play! Or create a macro and click the button. Will use shovels or pickaxes to mine at your feet.
 
 import API
+import random
 
 tools = [0x0F39, 0x0E86, 0x66F7, 0x6485]
+GRID_SIZE = 8
+MINE_NEARBY = True # Set to false to strictly mine at your feet only, true to mine nearby chunks as well.
 
-def get_chunk_bounds(chunk_x, chunk_y, grid_size=8):
+def get_chunk_bounds(chunk_x, chunk_y, grid_size=GRID_SIZE):
     """
     Return the starting and ending (x, y) tile coordinates for a chunk.
     Returns (start_x, start_y, end_x, end_y)
@@ -15,7 +18,7 @@ def get_chunk_bounds(chunk_x, chunk_y, grid_size=8):
     end_y = start_y + grid_size - 1
     return start_x, start_y, end_x, end_y
 
-def get_chunk_outline_tiles(chunk_x, chunk_y, grid_size=8):
+def get_chunk_outline_tiles(chunk_x, chunk_y, grid_size=GRID_SIZE):
     """
     Given a chunk coordinate, return all (x, y) tile positions that form the outline (perimeter) of the chunk.
     """
@@ -34,7 +37,7 @@ def get_chunk_outline_tiles(chunk_x, chunk_y, grid_size=8):
         tiles.append((end_x, y))        # Right edge
     return tiles
 
-def get_nearby_chunks(x, y, radius, grid_size=8):
+def get_nearby_chunks(x, y, radius, grid_size=GRID_SIZE):
     """
     Given any x, y position (tile coordinates), return all chunk coordinates (chunk_x, chunk_y)
     within the given radius (in chunks) in all directions, based on 8x8 chunk grid.
@@ -60,6 +63,21 @@ def get_nearby_chunks(x, y, radius, grid_size=8):
     chunks.add((center_chunk_x, center_chunk_y))
     result = sorted(list(chunks))
     return result
+
+def mine():
+    API.UseObject(tool)
+    API.WaitForTarget()
+    API.TargetLandRel(0, 0)
+
+def wait_for_mining():
+    while not API.InJournalAny(["There is no metal here"], True) and not API.StopRequested:
+        API.Pause(0.5)
+        weight_check()
+
+def weight_check():
+    if API.Player.Weight >= API.Player.WeightMax - 10:
+        API.SysMsg("Inventory full, stopping script.")
+        API.Stop()
 
 tool = None
 
@@ -98,8 +116,16 @@ else:
         allStats = API.GetStaticsInArea(startx, starty, endx, endy)
         for static in allStats:
             if (static.X, static.Y) in get_chunk_outline_tiles(chunk_x, chunk_y):
-                static.Hue = color
+                static.Hue = color    
 
-    API.UseObject(tool)
-    API.WaitForTarget()
-    API.TargetLandRel(0, 0)
+    for chunk_x, chunk_y in nearby_chunks:
+        mine()
+        if not MINE_NEARBY:
+            API.Stop()
+            break
+        wait_for_mining()
+        weight_check()
+        API.SysMsg(f"Moving to chunk ({chunk_x}, {chunk_y})")
+        API.Pathfind(random.randint(chunk_x * GRID_SIZE + 1, chunk_x * GRID_SIZE + 7), random.randint(chunk_y * GRID_SIZE + 1, chunk_y * GRID_SIZE + 7))
+        while API.Pathfinding():
+            API.Pause(0.1)
