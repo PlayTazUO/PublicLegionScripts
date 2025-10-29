@@ -2,6 +2,7 @@
 
 import API
 import random
+import time
 
 tools = [0x0F39, 0x0E86, 0x66F7, 0x6485]
 GRID_SIZE = 8
@@ -65,12 +66,13 @@ def get_nearby_chunks(x, y, radius, grid_size=GRID_SIZE):
     return result
 
 def mine():
-    API.UseObject(tool)
+    API.UseObject(get_tool())
     API.WaitForTarget()
     API.TargetLandRel(0, 0)
 
 def wait_for_mining():
-    while not API.InJournalAny(["There is no metal here"], True) and not API.StopRequested:
+    max = time.time() + 30
+    while not API.InJournalAny(["There is no metal here", "You can't mine there", "You have worn out your tool"], True) and not API.StopRequested and time.time() < max:
         API.Pause(0.5)
         weight_check()
 
@@ -79,53 +81,57 @@ def weight_check():
         API.SysMsg("Inventory full, stopping script.")
         API.Stop()
 
-tool = None
+def get_tool():
 
-tool = API.FindLayer("onehanded")
-#API.SysMsg(f"Tool in onehanded: {tool}")
-if tool and tool.Graphic not in tools:
     tool = None
 
-tool = API.FindLayer("twohanded")
-#API.SysMsg(f"Tool in twohanded: {tool}")
-if tool and tool.Graphic not in tools:
-    tool = None
+    tool = API.FindLayer("onehanded")
+    #API.SysMsg(f"Tool in onehanded: {tool}")
+    if tool and tool.Graphic not in tools:
+        tool = None
 
-if not tool:
-    for t in tools:
-        tool = API.FindType(t, API.Backpack)
-        if tool:
-            break
+    tool = API.FindLayer("twohanded")
+    #API.SysMsg(f"Tool in twohanded: {tool}")
+    if tool and tool.Graphic not in tools:
+        tool = None
 
-if not tool:
-    API.Stop()
-else:
-    x = API.Player.X
-    y = API.Player.Y
-    nearby_chunks = []
-    nearby_chunks.extend(get_nearby_chunks(x, y, 1))
-    #API.SysMsg(f"Nearby chunks: {nearby_chunks}, {len(nearby_chunks)} total")
-    outline_tiles = []
-    c = 1
-    for chunk_x, chunk_y in nearby_chunks:
-        color = 34 * c
-        c+=1
-        outline_tiles.extend(get_chunk_outline_tiles(chunk_x, chunk_y))
-        # Get correct bounds for this chunk
-        startx, starty, endx, endy = get_chunk_bounds(chunk_x, chunk_y)
-        allStats = API.GetStaticsInArea(startx, starty, endx, endy)
-        for static in allStats:
-            if (static.X, static.Y) in get_chunk_outline_tiles(chunk_x, chunk_y):
-                static.Hue = color    
+    if not tool:
+        for t in tools:
+            tool = API.FindType(t, API.Backpack)
+            if tool:
+                break
 
-    for chunk_x, chunk_y in nearby_chunks:
-        mine()
-        if not MINE_NEARBY:
-            API.Stop()
-            break
-        wait_for_mining()
-        weight_check()
-        API.SysMsg(f"Moving to chunk ({chunk_x}, {chunk_y})")
-        API.Pathfind(random.randint(chunk_x * GRID_SIZE + 1, chunk_x * GRID_SIZE + 7), random.randint(chunk_y * GRID_SIZE + 1, chunk_y * GRID_SIZE + 7))
-        while API.Pathfinding():
-            API.Pause(0.1)
+    if not tool:
+        API.Stop()
+
+    return tool
+
+x = API.Player.X
+y = API.Player.Y
+nearby_chunks = []
+nearby_chunks.extend(get_nearby_chunks(x, y, 1))
+#API.SysMsg(f"Nearby chunks: {nearby_chunks}, {len(nearby_chunks)} total")
+outline_tiles = []
+c = 1
+for chunk_x, chunk_y in nearby_chunks:
+    color = 34 * c
+    c+=1
+    outline_tiles.extend(get_chunk_outline_tiles(chunk_x, chunk_y))
+    # Get correct bounds for this chunk
+    startx, starty, endx, endy = get_chunk_bounds(chunk_x, chunk_y)
+    allStats = API.GetStaticsInArea(startx, starty, endx, endy)
+    for static in allStats:
+        if (static.X, static.Y) in get_chunk_outline_tiles(chunk_x, chunk_y):
+            static.Hue = color    
+
+for chunk_x, chunk_y in nearby_chunks:
+    mine()
+    if not MINE_NEARBY:
+        API.Stop()
+        break
+    wait_for_mining()
+    weight_check()
+    API.SysMsg(f"Moving to chunk ({chunk_x}, {chunk_y})")
+    API.Pathfind(random.randint(chunk_x * GRID_SIZE + 1, chunk_x * GRID_SIZE + 7), random.randint(chunk_y * GRID_SIZE + 1, chunk_y * GRID_SIZE + 7))
+    while API.Pathfinding():
+        API.Pause(0.1)
