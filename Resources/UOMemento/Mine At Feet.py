@@ -6,7 +6,12 @@ import time
 
 tools = [0x0F39, 0x0E86, 0x66F7, 0x6485]
 GRID_SIZE = 8
-MINE_NEARBY = True # Set to false to strictly mine at your feet only, true to mine nearby chunks as well.
+
+# Set to false to strictly mine at your feet only, true to mine nearby chunks as well.
+MINE_NEARBY = True
+
+# Set to false to mine land instead of statics
+USE_STATICS = False
 
 def get_chunk_bounds(chunk_x, chunk_y, grid_size=GRID_SIZE):
     """
@@ -68,7 +73,10 @@ def get_nearby_chunks(x, y, radius, grid_size=GRID_SIZE):
 def mine():
     API.UseObject(get_tool())
     API.WaitForTarget()
-    API.TargetLandRel(0, 0)
+    if not USE_STATICS:
+        API.TargetLandRel(0, 0)
+    else:
+        API.TargetTileRel(0, 0)
 
 def wait_for_mining():
     max = time.time() + 30
