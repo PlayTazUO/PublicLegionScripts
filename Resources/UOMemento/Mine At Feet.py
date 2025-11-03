@@ -71,7 +71,12 @@ def get_nearby_chunks(x, y, radius, grid_size=GRID_SIZE):
     return result
 
 def mine():
-    API.UseObject(get_tool())
+    tool = get_tool()
+    if not tool:
+        API.Stop()
+        return
+    
+    API.UseObject(tool)
     API.WaitForTarget()
     if not USE_STATICS:
         API.TargetLandRel(0, 0)
