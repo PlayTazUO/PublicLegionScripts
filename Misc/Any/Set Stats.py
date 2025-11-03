@@ -2,32 +2,32 @@
 import API
 
 #Set your desired stats here
-str = 75
-int = 125
-dex = 25
+STR = 75
+INT = 125
+DEX = 25
 
 while True:
     locked = 0
 
-    if API.Player.Strength > str:
+    if API.Player.Strength > STR:
         API.SetStatLock("str", "down")
-    elif API.Player.Strength < str:
+    elif API.Player.Strength < STR:
         API.SetStatLock("str", "up")
     else:
         API.SetStatLock("str", "locked")
         locked += 1
 
-    if API.Player.Intelligence > int:
+    if API.Player.Intelligence > INT:
         API.SetStatLock("int", "down")
-    elif API.Player.Intelligence < int:
+    elif API.Player.Intelligence < INT:
         API.SetStatLock("int", "up")
     else:
         API.SetStatLock("int", "locked")
         locked += 1
 
-    if API.Player.Dexterity > dex:
+    if API.Player.Dexterity > DEX:
         API.SetStatLock("dex", "down")
-    elif API.Player.Dexterity < dex:
+    elif API.Player.Dexterity < DEX:
         API.SetStatLock("dex", "up")
     else:
         API.SetStatLock("dex", "locked")
