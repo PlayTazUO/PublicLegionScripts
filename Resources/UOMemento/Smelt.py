@@ -28,7 +28,8 @@ if not Forge:
     API.Stop()
 
 for ore in ORES:
-    if API.FindType(ore):
+    while API.FindType(ore, API.Backpack):
         API.UseObject(API.Found)
-        API.WaitForTarget()
-        API.Target(Forge.X, Forge.Y, Forge.Z, Forge.Graphic)
+        if API.WaitForTarget("any", 1):
+            API.Target(Forge.X, Forge.Y, Forge.Z, Forge.Graphic)
+    API.Pause(API.Profile.MoveItemDelay / 1000)

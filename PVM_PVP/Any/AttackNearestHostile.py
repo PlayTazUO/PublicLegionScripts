@@ -110,59 +110,58 @@ def useAbility():
 
 def createEnableDisable(text, onEnable, onDisable, gump, x, y, firstChecked):
     global lastGroup
-    label = API.CreateGumpTTFLabel(text, 16, "#FFFFFF", aligned="right", maxWidth=98)
+    label = API.Gumps.CreateGumpTTFLabel(text, 16, "#FFFFFF", aligned="right", maxWidth=98)
     label.SetPos(x, y)
     gump.Add(label)
 
-    button = API.CreateGumpRadioButton("Enable", lastGroup)
+    button = API.Gumps.CreateGumpRadioButton("Enable", lastGroup)
     button.IsChecked = firstChecked
     button.SetRect(x + 100, y, 100, 50)
-    API.AddControlOnClick(button, onEnable)
+    API.Gumps.AddControlOnClick(button, onEnable)
     gump.Add(button)
 
-    button2 = API.CreateGumpRadioButton("Disable", lastGroup)
+    button2 = API.Gumps.CreateGumpRadioButton("Disable", lastGroup)
     button2.IsChecked = not firstChecked
     button2.SetRect(x + 200, y, 100, 50)
-    API.AddControlOnClick(button2, onDisable)
+    API.Gumps.AddControlOnClick(button2, onDisable)
     gump.Add(button2)
     lastGroup += 1
 
 load_settings()
 
-gump = API.CreateGump()
+gump = API.Gumps.CreateGump()
 savedX = API.GetPersistentVar("AAXY", "100,100", API.PersistentVar.Char)
 split = savedX.split(',')
 
 gump.SetRect(int(split[0]), int(split[1]), 400, 175)
-bg = API.CreateGumpColorBox(0.7, "#212121").SetRect(0, 0, 400, 175)
+bg = API.Gumps.CreateGumpColorBox(0.7, "#212121").SetRect(0, 0, 400, 175)
 gump.Add(bg)
-label = API.CreateGumpTTFLabel("AutoAttack Script", 24, "#FF8800", aligned="center", maxWidth=400)
+label = API.Gumps.CreateGumpTTFLabel("AutoAttack Script", 24, "#FF8800", aligned="center", maxWidth=400)
 gump.Add(label)
 
 createEnableDisable("Auto Follow", enable_follow, disable_follow, gump, 25, 50, auto_follow)
 createEnableDisable("Honor Targets", enable_honor, disable_honor, gump, 25, 75, honorTargets)
 createEnableDisable("Primary Abil", enable_ability, disable_ability, gump, 25, 100, enableAbility)
 
-stopbutton = API.CreateSimpleButton("[STOP]", 100, 25)
+stopbutton = API.Gumps.CreateSimpleButton("[STOP]", 100, 25)
 stopbutton.SetPos(100, 125)
 stopbutton.SetBackgroundHue(32)
 gump.Add(stopbutton)
-API.AddControlOnClick(stopbutton, stop)
+API.Gumps.AddControlOnClick(stopbutton, stop)
 
-playbutton = API.CreateSimpleButton("[PAUSED]", 100, 25)
+playbutton = API.Gumps.CreateSimpleButton("[PAUSED]", 100, 25)
 playbutton.SetBackgroundHue(53)
 playbutton.SetPos(200, 125)
 gump.Add(playbutton)
-API.AddControlOnClick(playbutton, pause)
+API.Gumps.AddControlOnClick(playbutton, pause)
 
-targButton = API.CreateSimpleButton("[NEW TARGET]", 100, 25)
+targButton = API.Gumps.CreateSimpleButton("[NEW TARGET]", 100, 25)
 targButton.SetPos(150, 150)
 targButton.SetBackgroundHue(12)
 gump.Add(targButton)
-API.AddControlOnClick(targButton, new_target)
+API.Gumps.AddControlOnClick(targButton, new_target)
 
-
-API.AddGump(gump)
+API.Gumps.AddGump(gump)
 
 Player = API.Player
 while True:
@@ -183,7 +182,7 @@ while True:
         if auto_follow:
             API.AutoFollow(enemy)
 
-        while enemy and not enemy.IsDead and enemy.Distance < MAX_DISTANCE:
+        while enemy and not enemy.IsDead and enemy.Distance <= MAX_DISTANCE:
             if not enabled:
                 break
             if newTarget:
