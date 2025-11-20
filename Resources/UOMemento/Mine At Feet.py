@@ -12,6 +12,20 @@ MINE_NEARBY = True
 
 # Set to false to mine land instead of statics
 USE_STATICS = False
+OSI = False
+
+GRUNTS = [
+    "arghh", "ah", "phwew", "ooof",
+    "ouch my finger!", "all in a hard days work", "all I do is mine mine mine",
+    "is this enough ore yet?", "why is this rock so heavy?",
+    "just one more swing...", "my back is gonna hate me",
+    "these gloves ain't thick enough", "did that rock just move?",
+    "ugh… dust in my eyes", "pickaxe needs a vacation",
+    "this better be worth it", "I swear that vein was here a second ago",
+    "rocks… rocks everywhere", "I miss daylight",
+    "hope this doesn’t cave in", "another chip in the pick… great",
+    "my arms are noodles", "if I find one gem, I'm retiring"
+]
 
 def get_chunk_bounds(chunk_x, chunk_y, grid_size=GRID_SIZE):
     """
@@ -70,6 +84,27 @@ def get_nearby_chunks(x, y, radius, grid_size=GRID_SIZE):
     result = sorted(list(chunks))
     return result
 
+def glisten(radius):
+    found = API.GetItemsOnGround(radius)
+    if found:
+        for item in found:
+            if "A Glistening Ore Vein" in item.Name:
+                grunting()
+                API.HeadMsg("Found ya!", item.Serial, 166)
+                API.PathfindEntity(item, 1, True)
+                tool = get_tool()
+                API.UseObject(tool)
+                API.WaitForTarget()
+                API.Target(item)
+
+                while API.FindItem(item.Serial) or not API.InJournal("You can't mine that", True):
+                    API.Pause(0.5)
+
+                API.Pause(API.Profile.MoveItemDelay / 1000)
+
+def grunting():
+    API.HeadMsg(random.choice(GRUNTS), API.Player)
+
 def mine():
     tool = get_tool()
     if not tool:
@@ -85,13 +120,22 @@ def mine():
 
 def wait_for_mining():
     max = time.time() + 30
-    while not API.InJournalAny(["There is no metal here", "You can't mine there", "You have worn out your tool"], True) and not API.StopRequested and time.time() < max:
+    while not API.InJournalAny(["You can't mine that", "You have moved too far away", "There is no metal here", "You can't mine there", "You have worn out your tool"], True) and not API.StopRequested and time.time() < max:
         API.Pause(0.5)
         weight_check()
 
 def weight_check():
     if API.Player.Weight >= API.Player.WeightMax - 10:
         API.SysMsg("Inventory full, stopping script.")
+
+        while API.Player.Weight > API.Player.WeightMax:
+            found = API.FindType(0x19B9, API.Backpack, hue=0)
+            if found:
+                API.MoveItemOffset(found.Serial, 1, OSI=OSI)
+                API.Pause(API.Profile.MoveItemDelay / 1000)
+            else:
+                break
+
         API.Stop()
 
 def get_tool():
@@ -137,14 +181,18 @@ for chunk_x, chunk_y in nearby_chunks:
         if (static.X, static.Y) in get_chunk_outline_tiles(chunk_x, chunk_y):
             static.Hue = color    
 
+glisten(16)
+
 for chunk_x, chunk_y in nearby_chunks:
+    grunting()
     mine()
     if not MINE_NEARBY:
         API.Stop()
         break
     wait_for_mining()
     weight_check()
-    API.SysMsg(f"Moving to chunk ({chunk_x}, {chunk_y})")
+    grunting()
     API.Pathfind(random.randint(chunk_x * GRID_SIZE + 1, chunk_x * GRID_SIZE + 7), random.randint(chunk_y * GRID_SIZE + 1, chunk_y * GRID_SIZE + 7))
+    API.Pause(0.1)
     while API.Pathfinding():
         API.Pause(0.1)
