@@ -11,6 +11,7 @@ c_afollowsave = "aas_autofollow"
 c_honort = "aas_honortargets"
 c_abilituse = "aas_abilityuse"
 c_abilit = "aas_ability"
+c_meleemode = "aas_meleemode"
 
 auto_follow = False
 lastHonored = 0
@@ -19,12 +20,13 @@ honorTargets = True
 newTarget = False
 enableAbility = True
 ability = True # True = primary, False = secondary
+meleeMode = False
 lastGroup = 0
 status_label = None
 status_text = "Paused..."
 
 def load_settings():
-    global auto_follow, honorTargets, enableAbility, ability
+    global auto_follow, honorTargets, enableAbility, ability, meleeMode
     af = API.GetPersistentVar(c_afollowsave, "False", API.PersistentVar.Char)
     if af == "True":
         auto_follow = True
@@ -41,12 +43,17 @@ def load_settings():
     if ab == "False":
         ability = False
 
+    mm = API.GetPersistentVar(c_meleemode, "False", API.PersistentVar.Char)
+    if mm == "True":
+        meleeMode = True
+
 def save_settings():
-    global auto_follow, honorTargets, enableAbility, ability
+    global auto_follow, honorTargets, enableAbility, ability, meleeMode
     API.SavePersistentVar(c_afollowsave, "True" if auto_follow else "False", API.PersistentVar.Char)
     API.SavePersistentVar(c_honort, "True" if honorTargets else "False", API.PersistentVar.Char)
     API.SavePersistentVar(c_abilituse, "True" if enableAbility else "False", API.PersistentVar.Char)
     API.SavePersistentVar(c_abilit, "True" if ability else "False", API.PersistentVar.Char)
+    API.SavePersistentVar(c_meleemode, "True" if meleeMode else "False", API.PersistentVar.Char)
 
 def set_status(text):
     global status_label, status_text
@@ -92,6 +99,16 @@ def enable_ability():
 def disable_ability():
     global enableAbility
     enableAbility = False
+    save_settings()
+
+def enable_melee():
+    global meleeMode
+    meleeMode = True
+    save_settings()
+
+def disable_melee():
+    global meleeMode
+    meleeMode = False
     save_settings()
 
 def enable_primary():
@@ -165,7 +182,7 @@ gump = API.Gumps.CreateGump()
 savedX = API.GetPersistentVar("AAXY", "100,100", API.PersistentVar.Char)
 split = savedX.split(',')
 
-gheight = 200
+gheight = 225
 
 gump.SetRect(int(split[0]), int(split[1]), 400, gheight)
 bg = API.Gumps.CreateGumpColorBox(0.7, "#212121").SetRect(0, 0, 400, gheight)
@@ -178,6 +195,8 @@ status_label.SetPos(0, 25)
 gump.Add(status_label)
 
 lasty = 50
+createEnableDisable("Melee Mode", enable_melee, disable_melee, gump, 25, lasty, meleeMode)
+lasty = lasty + 25
 createEnableDisable("Auto Follow", enable_follow, disable_follow, gump, 25, lasty, auto_follow)
 lasty = lasty + 25
 createEnableDisable("Honor Targets", enable_honor, disable_honor, gump, 25, lasty, honorTargets)
@@ -215,9 +234,11 @@ while True:
         API.Pause(0.5)
         continue
 
+    dist = (MAX_DISTANCE if not meleeMode else 1)
+
     if SHOW_RADIUS_INDICATOR:
-        API.DisplayRange(MAX_DISTANCE, 32)    
-    enemy = API.NearestMobile([API.Notoriety.Gray, API.Notoriety.Criminal, API.Notoriety.Murderer], MAX_DISTANCE)
+        API.DisplayRange(dist, 32)    
+    enemy = API.NearestMobile([API.Notoriety.Gray, API.Notoriety.Criminal, API.Notoriety.Murderer], dist)
 
     if enemy:
         enemy_serial = enemy.Serial
@@ -228,13 +249,14 @@ while True:
         if auto_follow:
             API.AutoFollow(enemy)
 
-        while enemy and not enemy.IsDead and enemy.Distance <= MAX_DISTANCE:
-            if not enabled:
+        while enemy and not enemy.IsDead:
+            if not enabled or enemy.Distance > dist:
                 break
             if newTarget:
                 newTarget = False
                 enemy = None
-                API.HeadMsg("Selecting new target..", Player)
+                set_status("Selecting new target..")
+                API.Pause(0.1)
                 break
             API.ProcessCallbacks()
             API.Attack(enemy)
