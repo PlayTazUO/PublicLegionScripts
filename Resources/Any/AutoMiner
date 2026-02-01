@@ -1,0 +1,961 @@
+import API
+"""
+AutoMiner
+Version: 1.5
+Last Updated: 2026-02-01
+
+Version History:
+- 1.5: Runebook loop, dropoff automation, tool crafting/restock, UI overhaul.
+
+Features:
+- Runebook-driven mining loop (home rune in slot 1, mining runes 51-65).
+- Auto-mines nearby tiles and advances when the area is depleted.
+- Overweight handling: smelt (optional) then recall home to unload and restock.
+- Auto-unload: ore, ingots, gems to drop container; blackrock to trash.
+- Tooling automation: keeps tinker tools fresh and shovels stocked.
+- Persistent settings for runebook, drop container, and trash container.
+
+Controls (Gump):
+- Enable/Disable: start/stop mining loop.
+- Use Fire Beetle: smelt at a nearby fire beetle when overweight.
+- Runebook: set/unset the runebook used for recalls.
+- Drop Container: set/unset the container for ore/ingot/gem dropoff.
+- Trash: set/unset the container for blackrock disposal.
+
+Setup (first run):
+1) Runebook: Home recall rune must be in the first slot (gump button 50).
+2) Mining runes: Slots 2+ (gump buttons 51-65) are mining locations.
+3) Set Runebook, Drop Container, and Trash from the gump.
+4) Keep a tinker's tool in your backpack (the script will craft replacements).
+5) Ensure drop container has hue-0 ingots for restocking shovels.
+"""
+
+# Journal texts that mark tiles as non-mineable.
+NO_ORE_CACHE_TEXTS = [
+    "You can't mine there.",
+    "There is no metal here to mine.",
+    "Target cannot be seen.",
+    "You cannot see that location.",
+]
+# Journal texts that indicate a mining tool broke.
+TOOL_WORN_TEXTS = [
+    "You have worn out your tool!",
+    "You destroyed the item : pickaxe",
+    "You destroyed the item : shovel",
+]
+# Journal text when ore is lost due to full backpack.
+OVERWEIGHT_TEXTS = [
+    "Your backpack is full, so the ore you mined is lost.",
+]
+# Journal text for hard encumbrance (can't move).
+ENCUMBERED_TEXTS = [
+    "Thou art too encumbered to move.",
+]
+
+# Tool and resource graphics.
+SHOVEL_GRAPHIC = 0x0F3A  # Shovel item graphic.
+PICKAXE_GRAPHIC = 0x0E86  # Pickaxe item graphic.
+ORE_GRAPHICS = [0x19B9, 0x19B8, 0x19BA]  # Ore piles.
+ORE_GRAPHIC_MIN2 = 0x19B7  # Ore that requires 2+ to smelt.
+INGOT_GRAPHICS = [0x1BF2]  # Base ingot graphic.
+GEM_GRAPHICS = [0x3198, 0x3197, 0x3194]  # Gems to deposit.
+BLACKSTONE_GRAPHICS = [0x0F2A, 0x0F2B]  # Blackrock to trash.
+
+# Drop and hue priorities (smaller graphic first, then hue order).
+DROP_PRIORITY = [0x19B7, 0x19BA, 0x19B8, 0x19B9]
+ORE_HUE_PRIORITY = [0, 2419, 2406, 2413, 2418, 2213, 2425, 2207, 2219]
+
+# Tinkering and smelting helpers.
+TINKER_TOOL_GRAPHIC = 0x1EB9  # Tinker's tool graphic.
+FORGE_GRAPHICS = [0x0FB1, 0x0E58]  # Common forges.
+FORGE_RANGE = 2  # Search radius for forges and beetles.
+FIRE_BEETLE_GRAPHIC = 0x00A9  # Fire beetle graphic.
+
+# Behavior flags and UI.
+DEBUG_STATICS = False  # Enable static debug output near forges.
+DEBUG_STATICS_LIMIT = 20  # Max statics to print when debugging.
+DEBUG_SMELT = False  # Enable smelt debug output.
+AUTO_TARGET_MINE = True  # Use auto-target mining offsets.
+HEADMSG_HUE = 1285  # Hue for overhead messages.
+RUNNING = False  # Script run state.
+CONTROL_GUMP = None  # Root gump reference.
+CONTROL_BUTTON = None  # Enable/Disable button reference.
+CONTROL_CONTROLS = []  # Strong refs to gump controls.
+USE_FIRE_BEETLE_SMELT = False  # Toggle smelting on beetle.
+
+# Persisted serials.
+RUNBOOK_SERIAL = 0  # Runebook serial.
+SECURE_CONTAINER_SERIAL = 0  # Drop container serial.
+TRASH_CONTAINER_SERIAL = 0  # Trash container serial.
+
+# Recall loop and cache state.
+USE_RECALL_ON_OVERWEIGHT = True  # Permanent: recall on overweight.
+NO_ORE_TILE_CACHE = set()  # Cached non-mineable tiles.
+LAST_PLAYER_POS = None  # Last known player position.
+MINING_RUNES = list(range(51, 66))  # Runebook buttons for mining spots.
+CURRENT_MINING_INDEX = 0  # Current mining rune index.
+NEEDS_TOOL_CHECK = False  # Deferred tooling check flag.
+NEEDS_INITIAL_RECALL = False  # Deferred first recall flag.
+
+# Round-robin drop offsets around the player.
+DROP_OFFSETS = [
+    (-1, -1),
+    (0, -1),
+    (1, -1),
+    (-1, 0),
+    (1, 0),
+    (-1, 1),
+    (0, 1),
+    (1, 1),
+]
+DROP_OFFSET_INDEX = 0
+
+# Smelting feedback texts.
+SMELT_SUCCESS_TEXTS = [
+    "You smelt the ore into ingots",
+]
+SMELT_FAIL_TEXTS = [
+    "That is too far away",
+    "You can't smelt",
+    "You cannot smelt",
+    "You must be near",
+]
+# Persistent storage key.
+DATA_KEY = "mining_bot_config"
+
+def _default_config():
+    # Default persisted settings.
+    return {
+        "runebook_serial": 0,
+        "drop_container_serial": 0,
+        "trash_container_serial": 0,
+    }
+
+def _load_config():
+    # Load persisted settings for runebook/drop/trash.
+    global RUNBOOK_SERIAL, SECURE_CONTAINER_SERIAL, TRASH_CONTAINER_SERIAL
+    raw = API.GetPersistentVar(DATA_KEY, "", API.PersistentVar.Char)
+    if raw:
+        try:
+            data = eval(raw)
+            RUNBOOK_SERIAL = int(data.get("runebook_serial", 0) or 0)
+            SECURE_CONTAINER_SERIAL = int(data.get("drop_container_serial", 0) or 0)
+            TRASH_CONTAINER_SERIAL = int(data.get("trash_container_serial", 0) or 0)
+            return
+        except Exception:
+            pass
+    data = _default_config()
+    RUNBOOK_SERIAL = data["runebook_serial"]
+    SECURE_CONTAINER_SERIAL = data["drop_container_serial"]
+    TRASH_CONTAINER_SERIAL = data["trash_container_serial"]
+
+def _save_config():
+    # Save persisted settings for runebook/drop/trash.
+    data = {
+        "runebook_serial": int(RUNBOOK_SERIAL or 0),
+        "drop_container_serial": int(SECURE_CONTAINER_SERIAL or 0),
+        "trash_container_serial": int(TRASH_CONTAINER_SERIAL or 0),
+    }
+    API.SavePersistentVar(DATA_KEY, repr(data), API.PersistentVar.Char)
+# Tinker gump + button ids.
+TINKER_GUMP_ID = 0x1CC  # Tinker gump id.
+TINKER_BTN_SHOVEL = 18  # Craft shovel button.
+TINKER_BTN_TINKER_TOOL = 11  # Craft tinker tool button.
+
+def _find_ore_in_backpack():
+    # Find the next smeltable ore in the backpack, honoring special min-stack rules.
+    # Special case: only smelt 0x19B7 when stack is 2+ (check recursively).
+    items = API.ItemsInContainer(API.Backpack, True)
+    if items:
+        for item in items:
+            if item.Graphic == ORE_GRAPHIC_MIN2 and int(item.Amount) >= 2:
+                return item
+    for graphic in ORE_GRAPHICS:
+        ore = API.FindType(graphic, API.Backpack)
+        if ore:
+            return ore
+    return None
+
+def _find_item_by_graphic(graphic):
+    # Return the first item in the backpack (recursive) matching the graphic.
+    items = API.ItemsInContainer(API.Backpack, True)
+    if not items:
+        return None
+    for item in items:
+        if item.Graphic == graphic:
+            return item
+    return None
+
+def _get_items_by_graphic(graphic):
+    # Return all items in backpack matching the graphic.
+    items = API.ItemsInContainer(API.Backpack, True)
+    if not items:
+        return []
+    return [i for i in items if i.Graphic == graphic]
+
+def _count_ingots_in_backpack():
+    # Count hue-0 ingots in the backpack.
+    total = 0
+    items = API.ItemsInContainer(API.Backpack, True) or []
+    for item in items:
+        if item.Graphic in INGOT_GRAPHICS and int(item.Hue) == 0:
+            total += int(item.Amount)
+    return total
+
+def _count_shovels_in_backpack():
+    # Count shovels in the backpack.
+    items = API.ItemsInContainer(API.Backpack, True) or []
+    return sum(1 for i in items if i.Graphic == SHOVEL_GRAPHIC)
+
+def _has_tinker_tool():
+    # Check for a tinker's tool in the backpack.
+    return API.FindType(TINKER_TOOL_GRAPHIC, API.Backpack) is not None
+
+def _tinker_tool_near_break():
+    # Check if any tinker's tool has 1 use remaining.
+    items = _get_items_by_graphic(TINKER_TOOL_GRAPHIC)
+    for item in items:
+        try:
+            props = item.NameAndProps(True, 2) or ""
+        except Exception:
+            props = ""
+        if "Uses remaining: 1" in props:
+            return True
+    return False
+
+def _craft_with_tinker(button_id):
+    # Craft an item using the tinker's tool gump.
+    tool = API.FindType(TINKER_TOOL_GRAPHIC, API.Backpack)
+    if not tool:
+        return False
+    API.UseObject(tool.Serial)
+    if not API.WaitForGump(TINKER_GUMP_ID, 3):
+        API.SysMsg("Tinker gump not found.")
+        return False
+    _sleep(0.5)
+    API.ReplyGump(int(button_id), TINKER_GUMP_ID)
+    _sleep(0.5)
+    API.CloseGump(TINKER_GUMP_ID)
+    API.CloseGump()
+    return True
+
+def _ensure_tooling_in_backpack():
+    # Ensure required tools exist before mining.
+    if not _has_tinker_tool():
+        API.HeadMsg("No tinker's tool in backpack.", API.Player, HEADMSG_HUE)
+        API.HeadMsg("You forgot to bring your tinker's tool", API.Player, HEADMSG_HUE)
+        _stop_running_with_message()
+        return
+    if _tinker_tool_near_break():
+        _craft_with_tinker(TINKER_BTN_TINKER_TOOL)
+    if not API.FindType(SHOVEL_GRAPHIC, API.Backpack):
+        _craft_with_tinker(TINKER_BTN_SHOVEL)
+
+def _find_drop_item():
+    # Drop by smallest graphic, then by hue priority (iron -> hued), then by lowest hue value.
+    items = API.ItemsInContainer(API.Backpack, True) or []
+    if not items:
+        return None
+    for graphic in sorted(set(DROP_PRIORITY)):
+        candidates = [i for i in items if i.Graphic == graphic]
+        if not candidates:
+            continue
+        for hue in ORE_HUE_PRIORITY:
+            for item in candidates:
+                try:
+                    if int(item.Hue) == int(hue):
+                        return item
+                except Exception:
+                    continue
+        try:
+            return sorted(candidates, key=lambda i: int(i.Hue))[0]
+        except Exception:
+            return candidates[0]
+    return None
+
+def _toggle_running():
+    # Toggle the main run state and refresh the gump button text.
+    global RUNNING, NEEDS_TOOL_CHECK, NEEDS_INITIAL_RECALL
+    RUNNING = not RUNNING
+    state = "ON" if RUNNING else "OFF"
+    if RUNNING:
+        API.Dismount()
+        API.ToggleFly()
+        NEEDS_TOOL_CHECK = True
+        if RUNBOOK_SERIAL:
+            NEEDS_INITIAL_RECALL = True
+    API.SysMsg(f"Mining: {state}")
+    _update_control_gump()
+
+def _toggle_fire_beetle():
+    # Toggle fire beetle smelting.
+    global USE_FIRE_BEETLE_SMELT
+    USE_FIRE_BEETLE_SMELT = not USE_FIRE_BEETLE_SMELT
+
+def _unset_runebook():
+    # Clear the runebook serial.
+    global RUNBOOK_SERIAL
+    RUNBOOK_SERIAL = 0
+    API.SysMsg("Runebook unset.")
+    _save_config()
+    _rebuild_control_gump()
+
+def _unset_secure_container():
+    # Clear the drop container serial.
+    global SECURE_CONTAINER_SERIAL
+    SECURE_CONTAINER_SERIAL = 0
+    API.SysMsg("Drop container unset.")
+    _save_config()
+    _rebuild_control_gump()
+
+def _set_trash_container():
+    # Target and set the trash container.
+    global TRASH_CONTAINER_SERIAL
+    API.SysMsg("Target your trash container.")
+    serial = API.RequestTarget()
+    if serial:
+        TRASH_CONTAINER_SERIAL = int(serial)
+        API.SysMsg("Trash container set.")
+        _save_config()
+        _rebuild_control_gump()
+
+def _unset_trash_container():
+    # Clear the trash container serial.
+    global TRASH_CONTAINER_SERIAL
+    TRASH_CONTAINER_SERIAL = 0
+    API.SysMsg("Trash container unset.")
+    _save_config()
+    _rebuild_control_gump()
+
+def _set_runebook():
+    # Target and set the runebook.
+    global RUNBOOK_SERIAL
+    API.SysMsg("Target your runebook.")
+    serial = API.RequestTarget()
+    if serial:
+        RUNBOOK_SERIAL = int(serial)
+        API.SysMsg("Runebook set.")
+        _save_config()
+        _rebuild_control_gump()
+
+def _set_secure_container():
+    # Target and set the drop container.
+    global SECURE_CONTAINER_SERIAL
+    API.SysMsg("Target your secure container.")
+    serial = API.RequestTarget()
+    if serial:
+        SECURE_CONTAINER_SERIAL = int(serial)
+        API.SysMsg("Drop container set.")
+        _save_config()
+        _rebuild_control_gump()
+
+def _update_control_gump():
+    # Refresh the gump button label to reflect current run state.
+    if not CONTROL_BUTTON:
+        return
+    CONTROL_BUTTON.Text = "Disable" if RUNNING else "Enable"
+
+def _stop_running_with_message():
+    # Stop the run loop without closing the gump.
+    global RUNNING, NEEDS_TOOL_CHECK, NEEDS_INITIAL_RECALL
+    RUNNING = False
+    NEEDS_TOOL_CHECK = False
+    NEEDS_INITIAL_RECALL = False
+    _update_control_gump()
+
+def _rebuild_control_gump():
+    # Rebuild the gump to reflect updated settings.
+    global CONTROL_GUMP, CONTROL_BUTTON, CONTROL_CONTROLS
+    if CONTROL_GUMP:
+        CONTROL_GUMP.Dispose()
+        CONTROL_GUMP = None
+    CONTROL_BUTTON = None
+    CONTROL_CONTROLS = []
+    _create_control_gump()
+
+def _pause_if_needed():
+    # Block execution while paused, still processing gump callbacks.
+    while not RUNNING:
+        API.ProcessCallbacks()
+        API.Pause(0.1)
+
+def _sleep(seconds):
+    # Pause in small steps so the pause button is responsive.
+    elapsed = 0.0
+    step = 0.1
+    while elapsed < seconds:
+        _pause_if_needed()
+        API.ProcessCallbacks()
+        API.Pause(step)
+        elapsed += step
+
+def _wait_for_target(seconds):
+    # Wait for a target cursor while respecting pause state.
+    elapsed = 0.0
+    step = 0.1
+    while elapsed < seconds:
+        _pause_if_needed()
+        if API.HasTarget():
+            return True
+        API.Pause(step)
+        elapsed += step
+    return False
+
+def _reset_mine_cache_if_moved():
+    # Clear cached no-ore tiles when the player moves.
+    global LAST_PLAYER_POS, NO_ORE_TILE_CACHE
+    pos = (int(API.Player.X), int(API.Player.Y), int(API.Player.Z))
+    if LAST_PLAYER_POS is None:
+        LAST_PLAYER_POS = pos
+        return
+    if pos != LAST_PLAYER_POS:
+        NO_ORE_TILE_CACHE.clear()
+        LAST_PLAYER_POS = pos
+
+def _reset_mine_cache():
+    # Force-clear cached no-ore tiles.
+    global LAST_PLAYER_POS, NO_ORE_TILE_CACHE
+    NO_ORE_TILE_CACHE.clear()
+    LAST_PLAYER_POS = (int(API.Player.X), int(API.Player.Y), int(API.Player.Z))
+
+def _create_control_gump():
+    # Build the in-game gump for enabling/disabling the script.
+    global CONTROL_GUMP, CONTROL_BUTTON, CONTROL_CONTROLS
+    if CONTROL_GUMP:
+        return
+    g = API.CreateGump(True, True, False)
+    g.SetRect(100, 100, 320, 220)
+    bg = API.CreateGumpColorBox(0.7, "#1B1B1B")
+    bg.SetRect(0, 0, 320, 220)
+    g.Add(bg)
+
+    label = API.CreateGumpTTFLabel("Mining Bot Controller", 16, "#FFFFFF", "alagard", "center", 320)
+    label.SetPos(0, 6)
+    g.Add(label)
+
+    button = API.CreateSimpleButton("Enable", 100, 20)
+    button.SetPos(110, 35)
+    g.Add(button)
+    API.AddControlOnClick(button, _toggle_running)
+    CONTROL_BUTTON = button
+    CONTROL_CONTROLS.append(button)
+
+    beetle_cb = API.CreateGumpCheckbox("Use Fire Beetle", 996, USE_FIRE_BEETLE_SMELT)
+    beetle_cb.SetPos(20, 60)
+    g.Add(beetle_cb)
+    API.AddControlOnClick(beetle_cb, _toggle_fire_beetle)
+    CONTROL_CONTROLS.append(beetle_cb)
+
+    runebook_status = "Set" if RUNBOOK_SERIAL else "Unset"
+    runebook_label = API.CreateGumpTTFLabel(f"Runebook: {runebook_status}", 12, "#FFFFFF", "alagard", "left", 160)
+    runebook_label.SetPos(10, 94)
+    g.Add(runebook_label)
+    runebook_btn = API.CreateSimpleButton("Set", 50, 18)
+    runebook_btn.SetPos(190, 92)
+    g.Add(runebook_btn)
+    API.AddControlOnClick(runebook_btn, _set_runebook)
+    CONTROL_CONTROLS.append(runebook_btn)
+    runebook_unset = API.CreateSimpleButton("Unset", 50, 18)
+    runebook_unset.SetPos(245, 92)
+    g.Add(runebook_unset)
+    API.AddControlOnClick(runebook_unset, _unset_runebook)
+    CONTROL_CONTROLS.append(runebook_unset)
+
+    secure_status = "Set" if SECURE_CONTAINER_SERIAL else "Unset"
+    secure_label = API.CreateGumpTTFLabel(f"Drop Container: {secure_status}", 12, "#FFFFFF", "alagard", "left", 160)
+    secure_label.SetPos(10, 120)
+    g.Add(secure_label)
+    secure_btn = API.CreateSimpleButton("Set", 50, 18)
+    secure_btn.SetPos(190, 118)
+    g.Add(secure_btn)
+    API.AddControlOnClick(secure_btn, _set_secure_container)
+    CONTROL_CONTROLS.append(secure_btn)
+    secure_unset = API.CreateSimpleButton("Unset", 50, 18)
+    secure_unset.SetPos(245, 118)
+    g.Add(secure_unset)
+    API.AddControlOnClick(secure_unset, _unset_secure_container)
+    CONTROL_CONTROLS.append(secure_unset)
+
+    trash_status = "Set" if TRASH_CONTAINER_SERIAL else "Unset"
+    trash_label = API.CreateGumpTTFLabel(f"Trash: {trash_status}", 12, "#FFFFFF", "alagard", "left", 160)
+    trash_label.SetPos(10, 146)
+    g.Add(trash_label)
+    trash_btn = API.CreateSimpleButton("Set", 50, 18)
+    trash_btn.SetPos(190, 144)
+    g.Add(trash_btn)
+    API.AddControlOnClick(trash_btn, _set_trash_container)
+    CONTROL_CONTROLS.append(trash_btn)
+    trash_unset = API.CreateSimpleButton("Unset", 50, 18)
+    trash_unset.SetPos(245, 144)
+    g.Add(trash_unset)
+    API.AddControlOnClick(trash_unset, _unset_trash_container)
+    CONTROL_CONTROLS.append(trash_unset)
+
+    API.AddGump(g)
+    CONTROL_GUMP = g
+    _update_control_gump()
+
+def _drop_overweight_ore():
+    # Drop ore by priority until weight is under max.
+    while API.Player.Weight > API.Player.WeightMax:
+        _pause_if_needed()
+        dropped = False
+        for _ in range(len(DROP_PRIORITY)):
+            item = _find_drop_item()
+            if item:
+                _drop_item_round_robin(item)
+                _sleep(1.0)
+                dropped = True
+                break
+        if not dropped:
+            break
+
+def _drop_item_round_robin(item):
+    # Drop a single item using round-robin offsets.
+    dx, dy = _next_drop_offset()
+    API.QueueMoveItemOffset(item.Serial, 1, dx, dy, 0)
+
+def _next_drop_offset():
+    # Get next offset for round-robin drops.
+    global DROP_OFFSET_INDEX
+    if not DROP_OFFSETS:
+        return (0, 1)
+    dx, dy = DROP_OFFSETS[DROP_OFFSET_INDEX % len(DROP_OFFSETS)]
+    DROP_OFFSET_INDEX = (DROP_OFFSET_INDEX + 1) % len(DROP_OFFSETS)
+    return (dx, dy)
+
+def _drop_ore_until_weight(target_weight):
+    # Drop ore by priority until under the target weight.
+    API.SysMsg("Dropping ore to reduce weight.")
+    while API.Player.Weight > target_weight:
+        _pause_if_needed()
+        dropped = False
+        for _ in range(len(DROP_PRIORITY)):
+            item = _find_drop_item()
+            if item:
+                for attempt in range(1, 4):
+                    API.ClearJournal()
+                    before_amt = int(item.Amount)
+                    dx, dy = _next_drop_offset()
+                    API.QueueMoveItemOffset(item.Serial, 1, dx, dy, 0)
+                    _sleep(1.0)
+                    refreshed = API.FindItem(item.Serial)
+                    if refreshed and int(refreshed.Amount) == before_amt:
+                        API.MoveItemOffset(item.Serial, 1, dx, dy, 0, True)
+                        _sleep(1.0)
+                    if API.InJournal("You must wait to perform another action", True):
+                        _sleep(1.2)
+                        continue
+                    break
+                dropped = True
+                break
+        if not dropped:
+            break
+        if API.InJournal("You must wait to perform another action", True):
+            _sleep(1.0)
+        else:
+            _sleep(0.5)
+
+def _find_static_forge():
+    # Scan nearby statics for a forge graphic and return the closest match.
+    x = int(API.Player.X)
+    y = int(API.Player.Y)
+    statics = API.GetStaticsInArea(x - FORGE_RANGE, y - FORGE_RANGE, x + FORGE_RANGE, y + FORGE_RANGE) or []
+    # Some shards report statics inconsistently; fallback to per-tile scan.
+    if not statics:
+        for tx in range(x - FORGE_RANGE, x + FORGE_RANGE + 1):
+            for ty in range(y - FORGE_RANGE, y + FORGE_RANGE + 1):
+                tile_statics = API.GetStaticsAt(tx, ty)
+                if tile_statics:
+                    statics.extend(tile_statics)
+    if not statics:
+        return None
+    if DEBUG_STATICS:
+        shown = 0
+        for s in statics:
+            API.SysMsg(f"Static: 0x{int(s.Graphic):04X} at {int(s.X)},{int(s.Y)} z{int(s.Z)}")
+            shown += 1
+            if shown >= DEBUG_STATICS_LIMIT:
+                break
+    best = None
+    best_dist = 999999
+    for s in statics:
+        if s.Graphic not in FORGE_GRAPHICS:
+            continue
+        dx = int(s.X) - x
+        dy = int(s.Y) - y
+        dist = (dx * dx) + (dy * dy)
+        if dist < best_dist:
+            best = s
+            best_dist = dist
+    return best
+
+def _find_item_forge():
+    # Scan nearby ground items for a forge graphic.
+    items = API.GetItemsOnGround(FORGE_RANGE)
+    if not items:
+        return None
+    for item in items:
+        if item.Graphic in FORGE_GRAPHICS:
+            return item
+    return None
+
+def _find_forge():
+    # Find the nearest forge (static or item).
+    # Prefer static forge; fallback to item forge.
+    static_forge = _find_static_forge()
+    if static_forge:
+        return ("static", static_forge)
+    item_forge = _find_item_forge()
+    if item_forge:
+        return ("item", item_forge)
+    return (None, None)
+
+def _find_fire_beetle():
+    # Find a nearby fire beetle for smelting.
+    # Find a nearby fire beetle to use as a portable forge.
+    mobs = API.GetAllMobiles(graphic=FIRE_BEETLE_GRAPHIC, distance=FORGE_RANGE) or []
+    if not mobs:
+        return None
+    return mobs[0]
+
+def _smelt_ore():
+    # Smelt all eligible ore in the backpack at the nearest forge.
+    if DEBUG_SMELT:
+        API.SysMsg("Smelt: starting...")
+    beetle = _find_fire_beetle() if USE_FIRE_BEETLE_SMELT else None
+    forge_type, forge = _find_forge()
+    while not forge and not beetle:
+        _pause_if_needed()
+        API.SysMsg("No forge nearby. Move closer...")
+        _sleep(2.0)
+        beetle = _find_fire_beetle() if USE_FIRE_BEETLE_SMELT else None
+        forge_type, forge = _find_forge()
+    # Cache a forge item serial if possible; targeting items tends to be more reliable than statics.
+    forge_item = _find_item_forge()
+    while True:
+        _pause_if_needed()
+        ore = _find_ore_in_backpack()
+        if not ore:
+            if DEBUG_SMELT:
+                API.SysMsg("Smelt: no ore found in backpack.")
+            break
+        if DEBUG_SMELT:
+            API.SysMsg(f"Smelt ore: 0x{int(ore.Graphic):04X} serial {int(ore.Serial)}")
+        API.ClearJournal()
+        API.UseObject(ore.Serial)
+        _sleep(0.2)
+        got_target = _wait_for_target(2)
+        if not got_target:
+            # Fallback: use by graphic from backpack in case serial use fails.
+            try:
+                API.UseType(int(ore.Graphic), 1337, API.Backpack)
+            except Exception:
+                pass
+            got_target = _wait_for_target(2)
+        if got_target:
+            for _ in range(3):
+                if beetle:
+                    API.Target(beetle.Serial)
+                elif forge_item:
+                    API.Target(forge_item.Serial)
+                elif forge_type == "static":
+                    API.Target(int(forge.X), int(forge.Y), int(forge.Z), int(forge.Graphic))
+                else:
+                    API.Target(forge.Serial)
+                _sleep(0.2)
+                if not API.HasTarget():
+                    break
+            _sleep(0.8)
+            if DEBUG_SMELT and API.InJournalAny(SMELT_SUCCESS_TEXTS, True):
+                API.SysMsg("Smelt: success message detected.")
+        else:
+            if DEBUG_SMELT:
+                API.SysMsg("Smelt: no target cursor received (ore -> forge).")
+            # Alternate flow: use forge then target ore.
+            API.ClearJournal()
+            if beetle:
+                API.UseObject(beetle.Serial)
+            elif forge_item:
+                API.UseObject(forge_item.Serial)
+            elif forge_type == "static":
+                API.Target(int(forge.X), int(forge.Y), int(forge.Z), int(forge.Graphic))
+            else:
+                API.UseObject(forge.Serial)
+            _sleep(0.2)
+            if _wait_for_target(2):
+                for _ in range(3):
+                    API.Target(ore.Serial)
+                    _sleep(0.2)
+                    if not API.HasTarget():
+                        break
+            elif DEBUG_SMELT:
+                API.SysMsg("Smelt: no target cursor received (forge -> ore).")
+        # Smelt cooldown to reduce spam.
+        _sleep(1.2)
+
+def _recall_home():
+    # Recall to the home rune (button 50).
+    if not RUNBOOK_SERIAL:
+        API.SysMsg("No runebook set.")
+        return False
+    for _ in range(3):
+        API.ClearJournal()
+        API.Pause(0.3)
+        API.UseObject(RUNBOOK_SERIAL)
+        if API.WaitForGump(0x59, 3):
+            _sleep(1.5)
+            API.ReplyGump(50, 0x59)
+            return True
+        _sleep(0.6)
+    API.SysMsg("Runebook gump not found.")
+    return False
+
+def _recall_to_button(button_id):
+    # Recall using a specific runebook button id.
+    if not RUNBOOK_SERIAL:
+        API.SysMsg("No runebook set.")
+        return False
+    for _ in range(3):
+        API.ClearJournal()
+        API.Pause(0.3)
+        API.UseObject(RUNBOOK_SERIAL)
+        if API.WaitForGump(0x59, 3):
+            _sleep(1.5)
+            API.ReplyGump(int(button_id), 0x59)
+            _reset_mine_cache()
+            return True
+        _sleep(0.6)
+    API.SysMsg("Runebook gump not found.")
+    return False
+
+def _recall_mining_spot():
+    # Recall to the current mining rune.
+    if not MINING_RUNES:
+        return False
+    button_id = MINING_RUNES[CURRENT_MINING_INDEX]
+    API.SysMsg(f"Recalling to mining rune {button_id}.")
+    return _recall_to_button(button_id)
+
+def _advance_mining_spot():
+    # Advance to the next mining rune in the loop.
+    global CURRENT_MINING_INDEX
+    if not MINING_RUNES:
+        return
+    CURRENT_MINING_INDEX = (CURRENT_MINING_INDEX + 1) % len(MINING_RUNES)
+
+def _recall_home_and_unload():
+    # Recall home, unload, and restock.
+    API.SysMsg("Recalling home to unload.")
+    if _recall_home():
+        _sleep(5.0)
+        _unload_ore_and_ingots()
+        return True
+    return False
+
+def _move_item_to_container(item, container_serial):
+    # Move an item to a container with retry/backoff.
+    for attempt in range(1, 4):
+        API.ClearJournal()
+        API.MoveItem(item.Serial, container_serial, int(item.Amount))
+        _sleep(1.0)
+        if API.InJournal("You must wait to perform another action", True):
+            _sleep(1.2)
+            continue
+        return
+
+def _unload_ore_and_ingots():
+    # Unload ores/ingots/gems and trash blackrock.
+    if not SECURE_CONTAINER_SERIAL and not TRASH_CONTAINER_SERIAL:
+        API.SysMsg("No drop or trash container set.")
+        return
+    API.SysMsg("Unloading resources to containers.")
+    items = API.ItemsInContainer(API.Backpack, True) or []
+    for item in items:
+        if item.Graphic in BLACKSTONE_GRAPHICS:
+            if TRASH_CONTAINER_SERIAL:
+                _move_item_to_container(item, TRASH_CONTAINER_SERIAL)
+            continue
+        if SECURE_CONTAINER_SERIAL and (item.Graphic in ORE_GRAPHICS or item.Graphic == ORE_GRAPHIC_MIN2 or item.Graphic in INGOT_GRAPHICS or item.Graphic in GEM_GRAPHICS):
+            _move_item_to_container(item, SECURE_CONTAINER_SERIAL)
+    _restock_ingots_from_container(22)
+    _ensure_min_shovels_on_dropoff()
+
+def _restock_ingots_from_container(target_amount):
+    # Restock hue-0 ingots from the drop container.
+    if not SECURE_CONTAINER_SERIAL:
+        return
+    API.UseObject(SECURE_CONTAINER_SERIAL)
+    _sleep(0.5)
+    current = _count_ingots_in_backpack()
+    if current >= target_amount:
+        return
+    API.SysMsg("Restocking ingots from drop container.")
+    need = target_amount - current
+    items = API.ItemsInContainer(SECURE_CONTAINER_SERIAL, True) or []
+    for item in items:
+        if item.Graphic not in INGOT_GRAPHICS:
+            continue
+        if int(item.Hue) != 0:
+            continue
+        take = min(need, int(item.Amount))
+        if take <= 0:
+            continue
+        for attempt in range(1, 4):
+            API.ClearJournal()
+            API.MoveItem(item.Serial, API.Backpack, int(take))
+            _sleep(1.0)
+            if API.InJournal("You must wait to perform another action", True):
+                _sleep(1.2)
+                continue
+            break
+        need -= take
+        if need <= 0:
+            break
+
+def _ensure_min_shovels_on_dropoff():
+    # Ensure at least two shovels after dropoff.
+    if not SECURE_CONTAINER_SERIAL:
+        return
+    API.SysMsg("Ensuring at least two shovels.")
+    if _tinker_tool_near_break():
+        _craft_with_tinker(TINKER_BTN_TINKER_TOOL)
+    count = _count_shovels_in_backpack()
+    if count >= 2:
+        return
+    _restock_ingots_from_container(22)
+    while _count_shovels_in_backpack() < 2:
+        if _count_ingots_in_backpack() < 8:
+            API.SysMsg("Not enough ingots to craft shovels.")
+            break
+        _craft_with_tinker(TINKER_BTN_SHOVEL)
+        _sleep(0.5)
+
+def _mine_adjacent_tiles(mine_tools):
+    # Attempt mining 2 tiles in each cardinal direction. If all fail with "can't mine here", move on.
+    px = int(API.Player.X)
+    py = int(API.Player.Y)
+    offsets = [
+        (0, -1),
+        (0, -2),
+        (0, 1),
+        (0, 2),
+        (-1, 0),
+        (-2, 0),
+        (1, 0),
+        (2, 0),
+    ]
+    no_ore_count = 0
+    for dx, dy in offsets:
+        tx = px + dx
+        ty = py + dy
+        if (tx, ty) in NO_ORE_TILE_CACHE:
+            no_ore_count += 1
+            continue
+        _pause_if_needed()
+        API.ClearJournal()
+        API.UseObject(mine_tools)
+        if _wait_for_target(5):
+            API.TargetLandRel(dx, dy)
+        _sleep(2.2)
+        if API.InJournalAny(TOOL_WORN_TEXTS, True):
+            return "tool_worn"
+        if API.InJournalAny(NO_ORE_CACHE_TEXTS, True):
+            no_ore_count += 1
+            NO_ORE_TILE_CACHE.add((tx, ty))
+    if no_ore_count >= len(offsets):
+        API.SysMsg("No ore here... move.")
+        _sleep(3)
+        return "no_ore"
+    return "ok"
+
+_create_control_gump()
+_load_config()
+_rebuild_control_gump()
+
+MineTools = API.FindType(PICKAXE_GRAPHIC, API.Backpack) or API.FindType(SHOVEL_GRAPHIC, API.Backpack)
+if not MineTools:
+    API.SysMsg("You are out of mining equipment.")
+    _stop_running_with_message()
+
+API.SysMsg("AutoMiner loaded. Press Enable on the gump to start.")
+_pause_if_needed()
+API.SysMsg("Mining started...")
+
+while True:
+    API.ProcessCallbacks()
+    _pause_if_needed()
+    _reset_mine_cache_if_moved()
+    if NEEDS_TOOL_CHECK:
+        _ensure_tooling_in_backpack()
+        API.SysMsg("Tooling check complete.")
+        NEEDS_TOOL_CHECK = False
+        MineTools = API.FindType(PICKAXE_GRAPHIC, API.Backpack) or API.FindType(SHOVEL_GRAPHIC, API.Backpack)
+        if NEEDS_INITIAL_RECALL and RUNBOOK_SERIAL:
+            API.SysMsg("Recalling to first mining spot.")
+            _recall_mining_spot()
+            NEEDS_INITIAL_RECALL = False
+
+    overweight_trigger = API.Player.Weight >= (API.Player.WeightMax - 50) or API.InJournalAny(OVERWEIGHT_TEXTS, True)
+    encumbered_trigger = API.InJournalAny(ENCUMBERED_TEXTS, True)
+    if overweight_trigger:
+        if USE_RECALL_ON_OVERWEIGHT:
+            API.SysMsg("Overweight detected.")
+            if API.Player.Weight > API.Player.WeightMax:
+                API.SysMsg("Overweight: dropping ore before recall.")
+                _drop_ore_until_weight(API.Player.WeightMax - 50)
+        else:
+            _drop_overweight_ore()
+
+    if encumbered_trigger:
+        API.SysMsg("Encumbered: dropping ore.")
+        _drop_ore_until_weight(API.Player.WeightMax - 50)
+
+    if USE_RECALL_ON_OVERWEIGHT and (API.Player.Weight >= (API.Player.WeightMax - 50) or overweight_trigger):
+        API.SysMsg("Overweight detected.")
+        if USE_FIRE_BEETLE_SMELT:
+            API.SysMsg("Overweight: smelting ore.")
+            _smelt_ore()
+            if API.Player.Weight >= (API.Player.WeightMax - 50):
+                if _recall_home_and_unload():
+                    _advance_mining_spot()
+                    _sleep(1.0)
+                    _recall_mining_spot()
+        else:
+            if _recall_home_and_unload():
+                _advance_mining_spot()
+                _sleep(1.0)
+                _recall_mining_spot()
+
+    if AUTO_TARGET_MINE:
+        result = _mine_adjacent_tiles(MineTools)
+        if result == "tool_worn":
+            MineTools = API.FindType(PICKAXE_GRAPHIC, API.Backpack) or API.FindType(SHOVEL_GRAPHIC, API.Backpack)
+            if not MineTools:
+                if _recall_home_and_unload():
+                    _ensure_tooling_in_backpack()
+                    MineTools = API.FindType(PICKAXE_GRAPHIC, API.Backpack) or API.FindType(SHOVEL_GRAPHIC, API.Backpack)
+                    _advance_mining_spot()
+                    _sleep(1.0)
+                    _recall_mining_spot()
+            if not MineTools:
+                API.SysMsg("Out of tools.")
+                _stop_running_with_message()
+        elif result == "no_ore":
+            if _recall_home_and_unload():
+                _advance_mining_spot()
+                _sleep(1.0)
+                _recall_mining_spot()
+        continue
+
+    API.SysMsg("Target a new ore tile/rock.")
+    API.RequestTarget()
+    tile_pos = API.LastTargetPos
+    if not tile_pos:
+        API.SysMsg("No mining tile targeted. Stopping.")
+        API.Stop()
+    API.ClearJournal()
+    API.UseObject(MineTools)
+    if _wait_for_target(5):
+        API.Target(int(tile_pos.X), int(tile_pos.Y), int(tile_pos.Z), int(API.LastTargetGraphic))
+    _sleep(2.2)
