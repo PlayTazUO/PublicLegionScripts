@@ -2,8 +2,6 @@
 Publicly available scripts for the Legion Scripting Engine  
 These scripts are made for the [TazUO](https://github.com/bittiez/TazUO) Ultima Online client.  
 
-You can use our [VSCode extension](https://marketplace.visualstudio.com/items?itemName=TazmanianTad.legionscript) to make writing scripts easier.
-
 # Can I contribute my scripts?
 Yes! Absolutely.  
 
@@ -11,20 +9,5 @@ They should be organized like this: `/Category/Server('any' if server is not imp
 
 ## How?
 
-### It's easiest via your browser:  
-![image](https://github.com/user-attachments/assets/e1571198-61df-46fe-a712-1e7102e30f00)  
-
-### Name your file(type `/Skills/Any/MyScript.lscript` for example):  
-![image](https://github.com/user-attachments/assets/8b67d9d8-c856-4d5e-9586-38f6dd51ad38)  
-![image](https://github.com/user-attachments/assets/3660e43c-1f10-4ebe-9090-4e6a06ce3710)  
-
-### Copy your code:  
-![image](https://github.com/user-attachments/assets/e9200fe6-bc5d-4947-84bd-ec896f5ebb0f)  
-
-
-### Submit a PR(Pull request)
-![image](https://github.com/user-attachments/assets/4c37bc1b-afb2-418d-a1d2-bd40215e6a3d)  
-
-Follow the insctructions from there.  
-
-### Someone will review your script and approve/deny/request changes
+There are a multitude of videos on youtube for creating a Pull Request: 
+https://www.youtube.com/results?search_query=How+to+create+a+github+PR
