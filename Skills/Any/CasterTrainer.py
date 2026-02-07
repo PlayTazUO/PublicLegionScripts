@@ -12,6 +12,12 @@ Features:
 - Heals and meditates as needed during training.
 - Optional weapon prompts for Chivalry/Spellweaving training ranges.
 
+Updates:
+2026-02-07
+- Auto-targets self for all spells that produce a target cursor.
+- Auto-targets self for healing spells.
+- Increased target wait timeout to 5 seconds to catch slower cursors (e.g., Lightning).
+
 Setup:
 1) Open the gump and enter target skill caps for the schools you want to train.
 2) Press Start; the script will loop spells until each cap is reached.
@@ -151,17 +157,20 @@ def _heal_if_needed():
         if magery >= 50:
             _check_mana()
             API.CastSpell("Greater Heal")
+            _target_self_if_needed()
             API.Pause(4.0)
             continue
         if magery >= 30:
             _check_mana()
             API.CastSpell("Heal")
+            _target_self_if_needed()
             API.Pause(4.0)
             continue
         chiv = _get_skill_value("Chivalry")
         if chiv >= 30:
             _check_mana()
             API.CastSpell("Close Wounds")
+            _target_self_if_needed()
             API.Pause(4.0)
             continue
         spirit = _get_skill_value("Spirit Speak")
@@ -172,6 +181,7 @@ def _heal_if_needed():
         weaving = _get_skill_value("Spellweaving")
         if weaving >= 24 and not API.BuffExists("Gift of Renewal"):
             API.CastSpell("Gift of Renewal")
+            _target_self_if_needed()
             API.Pause(7.0)
             continue
         bandage = API.FindType(0x0E21, API.Backpack)
@@ -185,8 +195,14 @@ def _heal_if_needed():
 
 
 # Cast a spell by name.
+def _target_self_if_needed(timeout=5.0):
+    if API.WaitForTarget("any", timeout):
+        API.TargetSelf()
+
+
 def _cast_spell(spell_name):
     API.CastSpell(spell_name)
+    _target_self_if_needed()
 
 
 # Train a specific school until the target cap is reached.
