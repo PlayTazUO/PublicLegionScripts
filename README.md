@@ -7,7 +7,7 @@ You can use our [VSCode extension](https://marketplace.visualstudio.com/items?it
 # Can I contribute my scripts?
 Yes! Absolutely.  
 
-They should be organized like this: `/Category/Server('any' if server is not important)/myscript.lscript`  
+They should be organized like this: `/Category/Server('any' if server is not important)/myscript.py`  
 
 ## How?
 
