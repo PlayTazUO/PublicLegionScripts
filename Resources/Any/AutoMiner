@@ -19,11 +19,13 @@ Features:
 - Overweight handling: smelt (optional) then recall home to unload and restock.
 - Auto-unload: ore, ingots, gems, and blackrock to drop container.
 - Tooling automation: optionally crafts tools or pulls shovels from drop container.
-- Persistent settings for runebook, drop container, travel, tooling, smelt, and debug logging.
+- Persistent settings for runebook, drop container, travel, tooling, smelt, debug, and shard.
 - Debug log gump with export and toggleable debug messaging.
 
 Updates:
 2026-02-09
+- Added Shard selector (OSI/UOAlive) that controls targeting order for mining.
+- Added UOAlive tinker crafting flow (Tools category + shard-specific shovel/tinker buttons).
 - Added debug toggle on the control gump with persisted state.
 - Added debug log gump and export with a dedicated Log button.
 - Improved mine targeting to use land/static targeting based on tile graphics.
@@ -31,6 +33,9 @@ Updates:
 - Added caching for non-mineable tiles and "cannot see location" tiles.
 - Fixed journal logging order so cache decisions are based on intact journal entries.
 - Updated gump layout (Debug row, Log/Start row, uniform button alignment).
+- Fixed tooling pre-check to separate crafting vs. pull paths and guard tinker-tool usage.
+- Fixed overweight flow to avoid duplicate logs and recall only after drop/smelt attempts.
+- Corrected mountain mineable tile list (restored contiguous sequences; removed duplicates).
 2026-02-07
 - Added Auto Tooling toggle to choose between crafting tools or pulling shovels from drop container.
 - Persisted Auto Tooling setting.
@@ -62,6 +67,7 @@ Setup (first run):
 NO_ORE_CACHE_TEXTS = [
     "There is no metal here to mine.",
     "You cannot see that location.",
+    "Target cannot be seen.",
 ]
 # Journal texts that indicate a mining tool broke.
 TOOL_WORN_TEXTS = [
@@ -74,6 +80,7 @@ JOURNAL_LOG_TEXTS = [
     "Where do you wish to dig?",
     "You can't mine there.",
     "You cannot see that location.",
+    "Target cannot be seen.",
 ]
 # Journal text when ore is lost due to full backpack.
 OVERWEIGHT_TEXTS = [
@@ -105,9 +112,9 @@ MOUNTAIN_MINEABLE = [
     0x00F4, 0x00F5, 0x00F6, 0x00F7, 0x00FC, 0x00FD, 0x00FE, 0x00FF, 0x0100, 0x0101,
     0x0102, 0x0103, 0x0104, 0x0105, 0x0106, 0x0107, 0x010C, 0x010D, 0x010E, 0x010F,
     0x0110, 0x0111, 0x0112, 0x0113, 0x0114, 0x0115, 0x0116, 0x0117, 0x011E, 0x011F,
-    0x0120, 0x0121, 0x0122, 0x0123, 0x0124, 0x0125, 0x0126, 0x0128, 0x0128, 0x0129,
+    0x0120, 0x0121, 0x0122, 0x0123, 0x0124, 0x0125, 0x0126, 0x0127, 0x0128, 0x0129,
     0x0141, 0x0142, 0x0143, 0x0144, 0x01D3, 0x01D4, 0x01D5, 0x01D6, 0x01D7, 0x01D8,
-    0x01D9, 0x01DA, 0x01DC, 0x01DD, 0x01DE, 0x01DF, 0x01E0, 0x01E1, 0x01E2, 0x01E3,
+    0x01D9, 0x01DA, 0x01DB, 0x01DC, 0x01DD, 0x01DE, 0x01DF, 0x01E0, 0x01E1, 0x01E2, 0x01E3,
     0x01E4, 0x01E5, 0x01E6, 0x01E7, 0x01EC, 0x01ED, 0x01EE, 0x01EF, 0x021F, 0x0220,
     0x0221, 0x0222, 0x0223, 0x0224, 0x0225, 0x0226, 0x0227, 0x0228, 0x0229, 0x022A,
     0x022B, 0x022C, 0x022D, 0x022E, 0x022F, 0x0230, 0x0231, 0x0232, 0x0233, 0x0234,
@@ -226,7 +233,7 @@ DROP_PRIORITY = [0x19B7, 0x19BA, 0x19B8, 0x19B9]
 ORE_HUE_PRIORITY = [0, 2419, 2406, 2413, 2418, 2213, 2425, 2207, 2219]
 
 # Tinkering and smelting helpers.
-TINKER_TOOL_GRAPHIC = 0x1EB9  # Tinker's tool graphic.
+TINKER_TOOL_GRAPHICS = [0x1EB9, 0x1EB8]  # Tinker's tool graphics (UOAlive uses 0x1EB8).
 FORGE_GRAPHICS = [0x0FB1, 0x0E58]  # Common forges.
 FORGE_RANGE = 2  # Search radius for forges and beetles.
 FIRE_BEETLE_GRAPHIC = 0x00A9  # Fire beetle graphic.
@@ -249,6 +256,7 @@ CONTROL_CONTROLS = []  # Strong refs to gump controls.
 USE_FIRE_BEETLE_SMELT = False  # Toggle smelting on beetle.
 USE_TOOL_CRAFTING = True  # Toggle auto tool crafting.
 USE_SACRED_JOURNEY = False  # Toggle sacred journey button ranges.
+USE_UOALIVE_SHARD = False  # Toggle shard targeting order (UOAlive vs OSI).
 
 # Debug log gump state.
 
@@ -304,11 +312,12 @@ def _default_config():
         "use_tool_crafting": True,
         "use_sacred_journey": False,
         "debug_targeting": True,
+        "use_uoalive_shard": False,
     }
 
 def _load_config():
     # Load persisted settings for runebook/drop.
-    global RUNBOOK_SERIAL, SECURE_CONTAINER_SERIAL, USE_TOOL_CRAFTING, USE_FIRE_BEETLE_SMELT, USE_SACRED_JOURNEY, DEBUG_TARGETING
+    global RUNBOOK_SERIAL, SECURE_CONTAINER_SERIAL, USE_TOOL_CRAFTING, USE_FIRE_BEETLE_SMELT, USE_SACRED_JOURNEY, DEBUG_TARGETING, USE_UOALIVE_SHARD
     raw = API.GetPersistentVar(DATA_KEY, "", API.PersistentVar.Char)
     if raw:
         try:
@@ -322,6 +331,7 @@ def _load_config():
             USE_TOOL_CRAFTING = bool(data.get("use_tool_crafting", True))
             USE_SACRED_JOURNEY = bool(data.get("use_sacred_journey", False))
             DEBUG_TARGETING = bool(data.get("debug_targeting", True))
+            USE_UOALIVE_SHARD = bool(data.get("use_uoalive_shard", False))
             _refresh_recall_buttons()
             return
         except Exception:
@@ -331,6 +341,7 @@ def _load_config():
     SECURE_CONTAINER_SERIAL = data["drop_container_serial"]
     USE_SACRED_JOURNEY = data["use_sacred_journey"]
     DEBUG_TARGETING = data["debug_targeting"]
+    USE_UOALIVE_SHARD = data["use_uoalive_shard"]
     _refresh_recall_buttons()
 
 def _save_config():
@@ -342,12 +353,17 @@ def _save_config():
         "use_tool_crafting": bool(USE_TOOL_CRAFTING),
         "use_sacred_journey": bool(USE_SACRED_JOURNEY),
         "debug_targeting": bool(DEBUG_TARGETING),
+        "use_uoalive_shard": bool(USE_UOALIVE_SHARD),
     }
     API.SavePersistentVar(DATA_KEY, json.dumps(data), API.PersistentVar.Char)
 # Tinker gump + button ids.
-TINKER_GUMP_ID = 0x1CC  # Tinker gump id.
-TINKER_BTN_SHOVEL = 18  # Craft shovel button.
-TINKER_BTN_TINKER_TOOL = 11  # Craft tinker tool button.
+TINKER_GUMP_ID_OSI = 0x1CC  # Tinker gump id (OSI).
+TINKER_BTN_SHOVEL_OSI = 18  # Craft shovel button (OSI).
+TINKER_BTN_TINKER_TOOL_OSI = 11  # Craft tinker tool button (OSI).
+TINKER_GUMP_ID_UOALIVE = 0xD466EA9C  # Tinker gump id (UOAlive).
+TINKER_BTN_TOOLS_UOALIVE = 41  # Tools category (UOAlive).
+TINKER_BTN_TINKER_TOOL_UOALIVE = 62  # Tinker tool button (UOAlive).
+TINKER_BTN_SHOVEL_UOALIVE = 202  # Shovel button (UOAlive).
 
 def _find_ore_in_backpack():
     # Find the next smeltable ore in the backpack, honoring special min-stack rules.
@@ -378,6 +394,8 @@ def _get_items_by_graphic(graphic):
     items = API.ItemsInContainer(API.Backpack, True)
     if not items:
         return []
+    if isinstance(graphic, (list, tuple, set)):
+        return [i for i in items if i.Graphic in graphic]
     return [i for i in items if i.Graphic == graphic]
 
 def _count_ingots_in_backpack():
@@ -397,15 +415,23 @@ def _count_shovels_in_backpack():
 def _count_tinker_tools_in_backpack():
     # Count tinker's tools in the backpack.
     items = API.ItemsInContainer(API.Backpack, True) or []
-    return sum(1 for i in items if i.Graphic == TINKER_TOOL_GRAPHIC)
+    return sum(1 for i in items if i.Graphic in TINKER_TOOL_GRAPHICS)
 
 def _has_tinker_tool():
     # Check for a tinker's tool in the backpack.
-    return API.FindType(TINKER_TOOL_GRAPHIC, API.Backpack) is not None
+    return _find_tinker_tool() is not None
+
+def _find_tinker_tool():
+    # Find the first tinker's tool in the backpack.
+    for graphic in TINKER_TOOL_GRAPHICS:
+        tool = API.FindType(graphic, API.Backpack)
+        if tool:
+            return tool
+    return None
 
 def _tinker_tool_near_break():
     # Check if any tinker's tool has 1 use remaining.
-    items = _get_items_by_graphic(TINKER_TOOL_GRAPHIC)
+    items = _get_items_by_graphic(TINKER_TOOL_GRAPHICS)
     for item in items:
         try:
             props = item.NameAndProps(True, 2) or ""
@@ -417,33 +443,66 @@ def _tinker_tool_near_break():
 
 def _craft_with_tinker(button_id):
     # Craft an item using the tinker's tool gump.
-    tool = API.FindType(TINKER_TOOL_GRAPHIC, API.Backpack)
+    tool = _find_tinker_tool()
     if not tool:
         return False
     API.UseObject(tool.Serial)
-    if not API.WaitForGump(TINKER_GUMP_ID, 3):
+    gump_id = TINKER_GUMP_ID_UOALIVE if USE_UOALIVE_SHARD else TINKER_GUMP_ID_OSI
+    if not API.WaitForGump(gump_id, 3):
         API.SysMsg("Tinker gump not found.")
         return False
     _sleep(0.5)
-    API.ReplyGump(int(button_id), TINKER_GUMP_ID)
+    API.ReplyGump(int(button_id), gump_id)
     _sleep(0.5)
-    API.CloseGump(TINKER_GUMP_ID)
+    API.CloseGump(gump_id)
     API.CloseGump()
     return True
+
+def _craft_with_tinker_uoalive(button_id):
+    # Craft an item using the UOAlive tools category flow.
+    tool = _find_tinker_tool()
+    if not tool:
+        return False
+    API.UseObject(tool.Serial)
+    if not API.WaitForGump(TINKER_GUMP_ID_UOALIVE, 3):
+        API.SysMsg("Tinker gump not found.")
+        return False
+    _sleep(0.5)
+    API.ReplyGump(int(TINKER_BTN_TOOLS_UOALIVE), TINKER_GUMP_ID_UOALIVE)
+    _sleep(0.5)
+    API.ReplyGump(int(button_id), TINKER_GUMP_ID_UOALIVE)
+    _sleep(0.5)
+    API.CloseGump(TINKER_GUMP_ID_UOALIVE)
+    API.CloseGump()
+    return True
+
+def _craft_tinker_tool():
+    # Craft a spare tinker's tool (OSI only unless UOAlive button is known).
+    if USE_UOALIVE_SHARD:
+        return _craft_with_tinker_uoalive(TINKER_BTN_TINKER_TOOL_UOALIVE)
+    return _craft_with_tinker(TINKER_BTN_TINKER_TOOL_OSI)
+
+def _craft_shovel():
+    # Craft a shovel using the shard-appropriate button flow.
+    if USE_UOALIVE_SHARD:
+        return _craft_with_tinker_uoalive(TINKER_BTN_SHOVEL_UOALIVE)
+    return _craft_with_tinker(TINKER_BTN_SHOVEL_OSI)
 
 def _ensure_tooling_in_backpack():
     # Ensure required tools exist before mining.
     if USE_TOOL_CRAFTING:
-        if _count_tinker_tools_in_backpack() == 0:
+        tinker_count = _count_tinker_tools_in_backpack()
+        if tinker_count == 0:
             API.HeadMsg("No tinker's tool in backpack.", API.Player, HEADMSG_HUE)
             API.HeadMsg("You forgot to bring your tinker's tool", API.Player, HEADMSG_HUE)
             _stop_running_with_message()
             return
-        if _count_tinker_tools_in_backpack() == 1:
-            _craft_with_tinker(TINKER_BTN_TINKER_TOOL)
-    if not API.FindType(SHOVEL_GRAPHICS[0], API.Backpack) and not API.FindType(SHOVEL_GRAPHICS[1], API.Backpack):
-        _craft_with_tinker(TINKER_BTN_SHOVEL)
-    else:
+        if tinker_count == 1:
+            _craft_tinker_tool()
+        if _count_shovels_in_backpack() == 0:
+            _craft_shovel()
+        return
+    if _count_shovels_in_backpack() == 0:
         _ensure_shovels_from_drop_container()
 
 
@@ -580,6 +639,22 @@ def _set_secure_container():
         API.SysMsg("Drop container set.")
         _save_config()
         _rebuild_control_gump()
+
+def _set_shard_osi():
+    # Use OSI targeting order.
+    global USE_UOALIVE_SHARD
+    USE_UOALIVE_SHARD = False
+    API.SysMsg("Shard set to OSI.")
+    _save_config()
+    _rebuild_control_gump()
+
+def _set_shard_uoalive():
+    # Use UOAlive targeting order.
+    global USE_UOALIVE_SHARD
+    USE_UOALIVE_SHARD = True
+    API.SysMsg("Shard set to UOAlive.")
+    _save_config()
+    _rebuild_control_gump()
 
 def _set_debug_on():
     # Enable debug system messages.
@@ -789,95 +864,111 @@ def _create_control_gump():
     if CONTROL_GUMP:
         return
     g = API.CreateGump(True, True, False)
-    g.SetRect(100, 100, 320, 250)
+    g.SetRect(100, 100, 320, 270)
     bg = API.CreateGumpColorBox(0.7, "#1B1B1B")
-    bg.SetRect(0, 0, 320, 250)
+    bg.SetRect(0, 0, 320, 270)
     g.Add(bg)
 
     label = API.CreateGumpTTFLabel("Mining Bot Controller", 16, "#FFFFFF", "alagard", "center", 320)
     label.SetPos(0, 6)
     g.Add(label)
 
+    shard_label = API.CreateGumpTTFLabel(
+        f"Shard: {'UOAlive' if USE_UOALIVE_SHARD else 'OSI'}", 12, "#FFFFFF", "alagard", "left", 160
+    )
+    shard_label.SetPos(10, 60)
+    g.Add(shard_label)
+    shard_osi = API.CreateSimpleButton("OSI", 50, 18)
+    shard_osi.SetPos(190, 58)
+    g.Add(shard_osi)
+    API.AddControlOnClick(shard_osi, _set_shard_osi)
+    CONTROL_CONTROLS.append(shard_osi)
+    shard_uoalive = API.CreateSimpleButton("UOAlive", 50, 18)
+    shard_uoalive.SetPos(245, 58)
+    g.Add(shard_uoalive)
+    API.AddControlOnClick(shard_uoalive, _set_shard_uoalive)
+    CONTROL_CONTROLS.append(shard_uoalive)
+
     beetle_cb = API.CreateGumpCheckbox("Use Fire Beetle", 996, USE_FIRE_BEETLE_SMELT)
-    beetle_cb.SetPos(20, 60)
+    beetle_cb.SetPos(20, 82)
     g.Add(beetle_cb)
     API.AddControlOnClick(beetle_cb, _toggle_fire_beetle)
     CONTROL_CONTROLS.append(beetle_cb)
 
     tooling_cb = API.CreateGumpCheckbox("Auto Tooling", 996, USE_TOOL_CRAFTING)
-    tooling_cb.SetPos(20, 80)
+    tooling_cb.SetPos(20, 102)
     g.Add(tooling_cb)
     API.AddControlOnClick(tooling_cb, _toggle_tool_crafting)
     CONTROL_CONTROLS.append(tooling_cb)
 
     travel_mode = "Chiv" if USE_SACRED_JOURNEY else "Mage"
     travel_label = API.CreateGumpTTFLabel(f"Travel: {travel_mode}", 12, "#FFFFFF", "alagard", "left", 160)
-    travel_label.SetPos(10, 118)
+    travel_label.SetPos(10, 140)
     g.Add(travel_label)
     chiv_btn = API.CreateSimpleButton("Chiv", 50, 18)
-    chiv_btn.SetPos(190, 116)
+    chiv_btn.SetPos(190, 138)
     g.Add(chiv_btn)
     API.AddControlOnClick(chiv_btn, _set_travel_chiv)
     CONTROL_CONTROLS.append(chiv_btn)
     mage_btn = API.CreateSimpleButton("Mage", 50, 18)
-    mage_btn.SetPos(245, 116)
+    mage_btn.SetPos(245, 138)
     g.Add(mage_btn)
     API.AddControlOnClick(mage_btn, _set_travel_mage)
     CONTROL_CONTROLS.append(mage_btn)
 
     runebook_status = "Set" if RUNBOOK_SERIAL else "Unset"
     runebook_label = API.CreateGumpTTFLabel(f"Runebook: {runebook_status}", 12, "#FFFFFF", "alagard", "left", 160)
-    runebook_label.SetPos(10, 142)
+    runebook_label.SetPos(10, 164)
     g.Add(runebook_label)
     runebook_btn = API.CreateSimpleButton("Set", 50, 18)
-    runebook_btn.SetPos(190, 140)
+    runebook_btn.SetPos(190, 162)
     g.Add(runebook_btn)
     API.AddControlOnClick(runebook_btn, _set_runebook)
     CONTROL_CONTROLS.append(runebook_btn)
     runebook_unset = API.CreateSimpleButton("Unset", 50, 18)
-    runebook_unset.SetPos(245, 140)
+    runebook_unset.SetPos(245, 162)
     g.Add(runebook_unset)
     API.AddControlOnClick(runebook_unset, _unset_runebook)
     CONTROL_CONTROLS.append(runebook_unset)
 
     secure_status = "Set" if SECURE_CONTAINER_SERIAL else "Unset"
     secure_label = API.CreateGumpTTFLabel(f"Drop Container: {secure_status}", 12, "#FFFFFF", "alagard", "left", 160)
-    secure_label.SetPos(10, 168)
+    secure_label.SetPos(10, 190)
     g.Add(secure_label)
     secure_btn = API.CreateSimpleButton("Set", 50, 18)
-    secure_btn.SetPos(190, 166)
+    secure_btn.SetPos(190, 188)
     g.Add(secure_btn)
     API.AddControlOnClick(secure_btn, _set_secure_container)
     CONTROL_CONTROLS.append(secure_btn)
     secure_unset = API.CreateSimpleButton("Unset", 50, 18)
-    secure_unset.SetPos(245, 166)
+    secure_unset.SetPos(245, 188)
     g.Add(secure_unset)
     API.AddControlOnClick(secure_unset, _unset_secure_container)
     CONTROL_CONTROLS.append(secure_unset)
 
     debug_status = "On" if DEBUG_TARGETING else "Off"
     debug_label = API.CreateGumpTTFLabel(f"Debug: {debug_status}", 12, "#FFFFFF", "alagard", "left", 160)
-    debug_label.SetPos(10, 196)
+    debug_label.SetPos(10, 214)
     g.Add(debug_label)
     debug_on = API.CreateSimpleButton("On", 50, 18)
-    debug_on.SetPos(190, 194)
+    debug_on.SetPos(190, 212)
     g.Add(debug_on)
     API.AddControlOnClick(debug_on, _set_debug_on)
     CONTROL_CONTROLS.append(debug_on)
     debug_off = API.CreateSimpleButton("Off", 50, 18)
-    debug_off.SetPos(245, 194)
+    debug_off.SetPos(245, 212)
     g.Add(debug_off)
     API.AddControlOnClick(debug_off, _set_debug_off)
     CONTROL_CONTROLS.append(debug_off)
 
     log_btn = API.CreateSimpleButton("Log", 60, 20)
-    log_btn.SetPos(80, 218)
+    log_btn.SetPos(80, 236)
     g.Add(log_btn)
     API.AddControlOnClick(log_btn, _open_log_gump)
     CONTROL_CONTROLS.append(log_btn)
 
     button = API.CreateSimpleButton("Start", 100, 20)
-    button.SetPos(130, 218)
+    button.SetPos(130, 236)
     g.Add(button)
     API.AddControlOnClick(button, _toggle_running)
     CONTROL_BUTTON = button
@@ -951,8 +1042,8 @@ def _handle_overweight():
         return False
 
     if overweight_trigger:
+        API.SysMsg("Overweight detected.")
         if USE_RECALL_ON_OVERWEIGHT:
-            API.SysMsg("Overweight detected.")
             if API.Player.Weight > API.Player.WeightMax:
                 API.SysMsg("Overweight: dropping ore before recall.")
                 _drop_ore_until_weight(API.Player.WeightMax - 50)
@@ -963,17 +1054,12 @@ def _handle_overweight():
         API.SysMsg("Encumbered: dropping ore.")
         _drop_ore_until_weight(API.Player.WeightMax - 50)
 
-    if USE_RECALL_ON_OVERWEIGHT and (API.Player.Weight >= (API.Player.WeightMax - 50) or overweight_trigger):
-        API.SysMsg("Overweight detected.")
+    if USE_RECALL_ON_OVERWEIGHT and API.Player.Weight >= (API.Player.WeightMax - 50):
         if USE_FIRE_BEETLE_SMELT:
             API.SysMsg("Overweight: smelting ore.")
             _smelt_ore()
-            if API.Player.Weight >= (API.Player.WeightMax - 50):
-                if _recall_home_and_unload():
-                    _advance_mining_spot()
-                    _sleep(1.0)
-                    _recall_mining_spot()
-        else:
+        if API.Player.Weight >= (API.Player.WeightMax - 50):
+            API.SysMsg("Overweight: recall to unload.")
             if _recall_home_and_unload():
                 _advance_mining_spot()
                 _sleep(1.0)
@@ -1210,28 +1296,45 @@ def _target_mine_tile(dx, dy, tx, ty, tile):
             _debug(
                 f"MineTarget: rel=({dx},{dy}) graphic=0x{int(tile.Graphic):04X} land={use_land} has_target={API.HasTarget()}"
             )
-        if use_land:
-            API.TargetLandRel(dx, dy)
-            _sleep(0.2)
-            if DEBUG_TARGETING:
-                _debug(f"MineTarget: after TargetLandRel has_target={API.HasTarget()}")
-            if not API.HasTarget():
-                return True
-            if DEBUG_TARGETING:
-                _debug("MineTarget: land rel still active; trying TargetTileRel fallback.")
+        if USE_UOALIVE_SHARD:
             API.TargetTileRel(dx, dy, int(tile.Graphic))
             _sleep(0.2)
             if DEBUG_TARGETING:
                 _debug(f"MineTarget: after TargetTileRel has_target={API.HasTarget()}")
             if not API.HasTarget():
                 return True
+            if use_land:
+                if DEBUG_TARGETING:
+                    _debug("MineTarget: tile rel still active; trying TargetLandRel fallback.")
+                API.TargetLandRel(dx, dy)
+                _sleep(0.2)
+                if DEBUG_TARGETING:
+                    _debug(f"MineTarget: after TargetLandRel has_target={API.HasTarget()}")
+                if not API.HasTarget():
+                    return True
         else:
-            API.TargetTileRel(dx, dy, int(tile.Graphic))
-            _sleep(0.2)
-            if DEBUG_TARGETING:
-                _debug(f"MineTarget: after TargetTileRel has_target={API.HasTarget()}")
-            if not API.HasTarget():
-                return True
+            if use_land:
+                API.TargetLandRel(dx, dy)
+                _sleep(0.2)
+                if DEBUG_TARGETING:
+                    _debug(f"MineTarget: after TargetLandRel has_target={API.HasTarget()}")
+                if not API.HasTarget():
+                    return True
+                if DEBUG_TARGETING:
+                    _debug("MineTarget: land rel still active; trying TargetTileRel fallback.")
+                API.TargetTileRel(dx, dy, int(tile.Graphic))
+                _sleep(0.2)
+                if DEBUG_TARGETING:
+                    _debug(f"MineTarget: after TargetTileRel has_target={API.HasTarget()}")
+                if not API.HasTarget():
+                    return True
+            else:
+                API.TargetTileRel(dx, dy, int(tile.Graphic))
+                _sleep(0.2)
+                if DEBUG_TARGETING:
+                    _debug(f"MineTarget: after TargetTileRel has_target={API.HasTarget()}")
+                if not API.HasTarget():
+                    return True
     if API.HasTarget():
         API.CancelTarget()
         return False
@@ -1298,7 +1401,7 @@ def _ensure_min_shovels_on_dropoff():
         API.SysMsg("No tinker's tool available to craft shovels.")
         return
     if _count_tinker_tools_in_backpack() == 1:
-        if not _craft_with_tinker(TINKER_BTN_TINKER_TOOL):
+        if not _craft_tinker_tool():
             API.SysMsg("Unable to craft a new tinker's tool.")
             return
     count = _count_shovels_in_backpack()
@@ -1314,10 +1417,10 @@ def _ensure_min_shovels_on_dropoff():
             API.SysMsg("No tinker's tool available to craft shovels.")
             break
         if _count_tinker_tools_in_backpack() == 1:
-            if not _craft_with_tinker(TINKER_BTN_TINKER_TOOL):
+            if not _craft_tinker_tool():
                 API.SysMsg("Unable to craft a new tinker's tool.")
                 break
-        if not _craft_with_tinker(TINKER_BTN_SHOVEL):
+        if not _craft_shovel():
             attempts += 1
         else:
             attempts = 0
@@ -1329,6 +1432,8 @@ def _ensure_min_shovels_on_dropoff():
 def _mine_adjacent_tiles(mine_tools):
     # Attempt mining 2 tiles in each cardinal direction. If all fail with "can't mine here", move on.
     global LAST_MINE_PASS_POS, MINE_CENTER
+    if not mine_tools:
+        return "tool_worn"
     if _handle_overweight():
         return "overweight"
     if MINE_CENTER is None:
@@ -1364,17 +1469,24 @@ def _mine_adjacent_tiles(mine_tools):
         API.ClearJournal()
         API.UseObject(mine_tools)
         _sleep(0.2)
+        tile = None
+        tile_is_mineable = False
+        tile_is_land = False
+        relx = 0
+        rely = 0
         if _wait_for_target(5):
             curx = int(API.Player.X)
             cury = int(API.Player.Y)
             relx = tx - curx
             rely = ty - cury
             tile = API.GetTile(int(tx), int(ty))
+            tile_is_mineable = tile and getattr(tile, "Graphic", None) in MINEABLE_GRAPHICS
+            tile_is_land = tile and getattr(tile, "Graphic", None) is not None and int(tile.Graphic) < 0x4000
             if DEBUG_TARGETING:
                 _debug(f"MineTarget: attempt target=({int(tx)},{int(ty)},{int(API.Player.Z)}) rel=({relx},{rely})")
             if tile and getattr(tile, "Graphic", None) is not None and DEBUG_TARGETING:
-                _debug(f"System: MineTarget: tile graphic=0x{int(tile.Graphic):04X} in_list={int(tile.Graphic) in MINEABLE_GRAPHICS}")
-            if tile and getattr(tile, "Graphic", None) in MINEABLE_GRAPHICS:
+                _debug(f"System: MineTarget: tile graphic=0x{int(tile.Graphic):04X} in_list={tile_is_mineable}")
+            if tile_is_mineable:
                 if not _target_mine_tile(relx, rely, tx, ty, tile):
                     API.SysMsg("Mining target failed; canceling cursor.")
                     API.CancelTarget()
@@ -1387,17 +1499,38 @@ def _mine_adjacent_tiles(mine_tools):
         elif DEBUG_TARGETING:
             _debug("MineTarget: wait_for_target timed out.")
         _sleep(2.2)
-        if API.InJournalAny(TOOL_WORN_TEXTS, True):
-            return "tool_worn"
-        if API.InJournalAny(NO_ORE_CACHE_TEXTS, True):
-            no_ore_count += 1
-            NO_ORE_TILE_CACHE.add((tx, ty))
-            if DEBUG_TARGETING:
-                _debug(f"MineTarget: cached no-ore tile ({tx},{ty}).")
         if DEBUG_TARGETING:
             for text in JOURNAL_LOG_TEXTS:
                 if API.InJournal(text, False):
                     _append_log(f"Journal: {text}")
+        if API.InJournalAny(TOOL_WORN_TEXTS, True):
+            return "tool_worn"
+        no_ore_hit = API.InJournalAny(NO_ORE_CACHE_TEXTS, False)
+        journal_prompt = API.InJournal("Where do you wish to dig?", False)
+        if journal_prompt and tile_is_mineable and not no_ore_hit:
+            # Retry with alternate targeting order for stubborn tiles (UOAlive/OSI differences).
+            API.ClearJournal()
+            API.UseObject(mine_tools)
+            _sleep(0.2)
+            if _wait_for_target(3):
+                if USE_UOALIVE_SHARD:
+                    if tile_is_land:
+                        API.TargetLandRel(relx, rely)
+                    else:
+                        API.TargetTileRel(relx, rely, int(tile.Graphic))
+                else:
+                    API.TargetTileRel(relx, rely, int(tile.Graphic))
+                _sleep(0.2)
+                if DEBUG_TARGETING:
+                    _debug(f"MineTarget: retry alt order rel=({relx},{rely})")
+            # Re-check journal after retry to capture "Target cannot be seen." and other cache texts.
+            no_ore_hit = API.InJournalAny(NO_ORE_CACHE_TEXTS, False)
+        if no_ore_hit:
+            no_ore_count += 1
+            NO_ORE_TILE_CACHE.add((tx, ty))
+            if DEBUG_TARGETING:
+                _debug(f"MineTarget: cached no-ore tile ({tx},{ty}).")
+            API.ClearJournal()
     if no_ore_count >= len(offsets):
         LAST_MINE_PASS_POS = MINE_CENTER
         API.SysMsg("No ore here... move.")
