@@ -15,7 +15,7 @@ else:
     # Find all items in backpack
     while True:
         # Find any item type (0 = all types) in backpack
-        item = API.FindType(4294967295, API.Backpack.Serial)
+        item = API.FindType(4294967295, API.Backpack)
 
         if not item:
             break
