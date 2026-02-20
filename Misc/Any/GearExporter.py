@@ -93,7 +93,7 @@ sorted_bonus_attributes = sorted(bonus_attributes.keys())
 w = 575
 h = 0
 
-gump = API.CreateGump(True, True)
+gump = API.CreateGump(True, True, True)
 
 bg = API.CreateGumpColorBox(0.4, "#D4202020")
 gump.Add(bg)
