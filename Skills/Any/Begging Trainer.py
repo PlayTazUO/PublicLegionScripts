@@ -1,9 +1,25 @@
 # Just press play near some blue's
 
 import time
+import random
 import API
 
 DELAY = 13
+
+customerMessages = [
+    "You look rich...", 
+    "They seem wealthy.",
+    "They definitely have deep pockets.",
+    "Must be nice to have that kind of money.",
+    "You can just tell they come from money.",
+    "They're living pretty comfortably, huh?",
+    "Looks like they aren't hurting for cash.",
+    "They've got that high-roller look.",
+    "You look like a million coins.",
+    "They give off major luxury vibes.",
+    "Must be rolling in it.",
+    "They clearly aren't checking the price tags."
+]
 
 nextScan = time.time()
 nextMsg = 0
@@ -35,7 +51,7 @@ def beg(mob):
     global beggedMobs
     global infoGump
 
-    if time.time() < nextScan:
+    if time.time() < nextScan or mob.Distance > 2:
         return
 
     API.UseSkill("Begging")
@@ -45,7 +61,7 @@ def beg(mob):
         nextScan = time.time() + DELAY
         beggedHash.add(mob.Serial)
         beggedMobs[mob.Serial] = time.time()
-        mob.SetOutlineColor(None)
+        mob.SetOutlineColor("#883333")
 
 
 while not API.StopRequested:
@@ -62,7 +78,7 @@ while not API.StopRequested:
             for m in mobs:
                 if m.Serial not in beggedHash:
                     if sendMessages:
-                        API.HeadMsg("POTENTIAL TARGET", m.Serial, 32)
+                        API.HeadMsg(random.choice(customerMessages), m.Serial, 32)
                         m.SetOutlineColor("#229933")
                     if m.Distance < 3:
                         beg(m)
@@ -87,3 +103,4 @@ while not API.StopRequested:
             beggedHash.remove(mobSerial)
 
     API.Pause(0.5)
+
