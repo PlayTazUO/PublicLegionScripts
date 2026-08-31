@@ -190,16 +190,16 @@ def _create_options_gump():
     global OPTIONS_GUMP
     if OPTIONS_GUMP:
         return
-    g = API.CreateGump(True, True, True)
+    g = API.Gumps.CreateGump(True, True, True)
     row_h = 22
     width = 220
     height = 60 + (len(LOOT_ITEM_CONFIG) * row_h)
     g.SetRect(130, 130, width, height)
-    bg = API.CreateGumpColorBox(0.7, "#1B1B1B")
+    bg = API.Gumps.CreateGumpColorBox(0.7, "#1B1B1B")
     bg.SetRect(0, 0, width, height)
     g.Add(bg)
 
-    label = API.CreateGumpTTFLabel("Butcher Loot Options", 16, "#FFFFFF", "alagard", "center", width)
+    label = API.Gumps.CreateGumpTTFLabel("Butcher Loot Options", 16, "#FFFFFF", "alagard", "center", width)
     label.SetPos(0, 6)
     g.Add(label)
 
@@ -208,19 +208,19 @@ def _create_options_gump():
         data = LOOT_ITEM_CONFIG.get(graphic)
         if not data:
             continue
-        cb = API.CreateGumpCheckbox(data["name"], 996, data["enabled"])
+        cb = API.Gumps.CreateGumpCheckbox(data["name"], 996, data["enabled"])
         cb.SetPos(10, y)
         g.Add(cb)
-        API.AddControlOnClick(cb, lambda c=cb, g_id=graphic: _set_loot_enabled(g_id, c.IsChecked))
+        API.Gumps.AddControlOnClick(cb, lambda c=cb, g_id=graphic: _set_loot_enabled(g_id, c.IsChecked))
         y += row_h
 
-    close_button = API.CreateSimpleButton("Close", 80, 20)
+    close_button = API.Gumps.CreateSimpleButton("Close", 80, 20)
     close_button.SetPos(width - 90, height - 26)
     g.Add(close_button)
-    API.AddControlOnClick(close_button, _close_options_gump)
+    API.Gumps.AddControlOnClick(close_button, _close_options_gump)
 
-    API.AddControlOnDisposed(g, _on_options_closed)
-    API.AddGump(g)
+    API.Gumps.AddControlOnDisposed(g, _on_options_closed)
+    API.Gumps.AddGump(g)
     OPTIONS_GUMP = g
 
 
@@ -247,28 +247,28 @@ def _create_control_gump():
     global CONTROL_GUMP, CONTROL_BUTTON
     if CONTROL_GUMP:
         return
-    g = API.CreateGump(True, True, True)
+    g = API.Gumps.CreateGump(True, True, True)
     g.SetRect(100, 100, 200, 90)
-    bg = API.CreateGumpColorBox(0.7, "#1B1B1B")
+    bg = API.Gumps.CreateGumpColorBox(0.7, "#1B1B1B")
     bg.SetRect(0, 0, 200, 90)
     g.Add(bg)
 
-    label = API.CreateGumpTTFLabel("Butcher Controller", 16, "#FFFFFF", "alagard", "center", 200)
+    label = API.Gumps.CreateGumpTTFLabel("Butcher Controller", 16, "#FFFFFF", "alagard", "center", 200)
     label.SetPos(0, 6)
     g.Add(label)
 
-    button = API.CreateSimpleButton("Enable", 90, 20)
+    button = API.Gumps.CreateSimpleButton("Enable", 90, 20)
     button.SetPos(10, 55)
     g.Add(button)
-    API.AddControlOnClick(button, _toggle_running)
+    API.Gumps.AddControlOnClick(button, _toggle_running)
     CONTROL_BUTTON = button
 
-    options = API.CreateSimpleButton("Options", 90, 20)
+    options = API.Gumps.CreateSimpleButton("Options", 90, 20)
     options.SetPos(100, 55)
     g.Add(options)
-    API.AddControlOnClick(options, _toggle_options_gump)
+    API.Gumps.AddControlOnClick(options, _toggle_options_gump)
 
-    API.AddGump(g)
+    API.Gumps.AddGump(g)
     CONTROL_GUMP = g
     _update_control_gump()
 

@@ -142,23 +142,23 @@ def _create_control_gump():
     global CONTROL_GUMP, CONTROL_BUTTON
     if CONTROL_GUMP:
         return
-    g = API.CreateGump(True, True, True)
+    g = API.Gumps.CreateGump(True, True, True)
     g.SetRect(100, 100, 180, 70)
-    bg = API.CreateGumpColorBox(0.7, "#1B1B1B")
+    bg = API.Gumps.CreateGumpColorBox(0.7, "#1B1B1B")
     bg.SetRect(0, 0, 180, 70)
     g.Add(bg)
 
-    label = API.CreateGumpTTFLabel("Mining Bot Controller", 16, "#FFFFFF", "alagard", "center", 180)
+    label = API.Gumps.CreateGumpTTFLabel("Mining Bot Controller", 16, "#FFFFFF", "alagard", "center", 180)
     label.SetPos(0, 6)
     g.Add(label)
 
-    button = API.CreateSimpleButton("Enable", 100, 20)
+    button = API.Gumps.CreateSimpleButton("Enable", 100, 20)
     button.SetPos(40, 35)
     g.Add(button)
-    API.AddControlOnClick(button, _toggle_running)
+    API.Gumps.AddControlOnClick(button, _toggle_running)
     CONTROL_BUTTON = button
 
-    API.AddGump(g)
+    API.Gumps.AddGump(g)
     CONTROL_GUMP = g
     _update_control_gump()
 

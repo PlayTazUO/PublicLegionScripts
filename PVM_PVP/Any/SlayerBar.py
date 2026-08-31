@@ -230,7 +230,7 @@ def draw_gem_for_active():
         
     for i, item in enumerate(slayer_items):
         if item.serial == active.Serial:
-            gem = API.CreateGumpItemPic(10542, 13, 13)
+            gem = API.Gumps.CreateGumpItemPic(10542, 13, 13)
             gem.SetX(i * 60 + 23)
             gem.SetY(0)
             current_gump.Add(gem)
@@ -246,7 +246,7 @@ def draw_slayer_gump():
         API.SysMsg("No slayer weapons found!", 33)
         return
 
-    current_gump = API.CreateGump(True, True, False)  # acceptMouseInput, canMove, keepOpen
+    current_gump = API.Gumps.CreateGump(True, True, False)  # acceptMouseInput, canMove, keepOpen
     gump_width = len(slayer_items) * 60 + 30  # Extra space for close button
     current_gump.SetWidth(gump_width)
     current_gump.SetHeight(55)
@@ -254,14 +254,14 @@ def draw_slayer_gump():
     current_gump.SetY(500)
 
     # Background
-    bg = API.CreateGumpColorBox(0.8, "#000000")
+    bg = API.Gumps.CreateGumpColorBox(0.8, "#000000")
     bg.SetWidth(gump_width)
     bg.SetHeight(55)
     current_gump.Add(bg)
 
     # Create buttons for each slayer weapon
     for i, item in enumerate(slayer_items):
-        btn = API.CreateGumpButton("", normal=item.slayer, pressed=item.slayer, hover=item.slayer)
+        btn = API.Gumps.CreateGumpButton("", normal=item.slayer, pressed=item.slayer, hover=item.slayer)
         btn.SetX(i * 60 + 5)
         btn.SetY(5)
         btn.SetWidth(50)
@@ -270,7 +270,7 @@ def draw_slayer_gump():
         slayer_button_map.append((item, btn))
 
     # Add close button
-    close_btn = API.CreateGumpButton("X", hue=946, normal=0x00EF, pressed=0x00F0, hover=0x00EE)
+    close_btn = API.Gumps.CreateGumpButton("X", hue=946, normal=0x00EF, pressed=0x00F0, hover=0x00EE)
     close_btn.SetX(len(slayer_items) * 60 + 5)
     close_btn.SetY(5)
     close_btn.SetWidth(20)
@@ -279,7 +279,7 @@ def draw_slayer_gump():
     slayer_button_map.append((None, close_btn))  # None item means close button
 
     draw_gem_for_active()
-    API.AddGump(current_gump)
+    API.Gumps.AddGump(current_gump)
     API.SysMsg(f"Slayer bar created with {len(slayer_items)} weapons. Click X to close.", 946)
 
 # -----------------------------

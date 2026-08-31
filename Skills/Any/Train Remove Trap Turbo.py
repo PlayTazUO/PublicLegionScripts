@@ -69,11 +69,11 @@ class CircuitUI:
         w = 629
         h = 415
 
-        self.gump1 = API.CreateGump(True, True)
+        self.gump1 = API.Gumps.CreateGump(True, True)
         self.gump1.SetWidth(w)
         self.gump1.SetHeight(h)
 
-        bg = API.CreateGumpColorBox(0, "#575757FF")
+        bg = API.Gumps.CreateGumpColorBox(0, "#575757FF")
         bg.SetWidth(w)
         bg.SetHeight(h)
         self.gump1.SetX(gump.GetX())
@@ -89,7 +89,7 @@ class CircuitUI:
         self.boxlist = []
         for y in range(0, 5):
             for x in range(0, 5):
-                box = API.CreateGumpColorBox(1, "#FFFFFF")
+                box = API.Gumps.CreateGumpColorBox(1, "#FFFFFF")
                 box.SetHeight(40)
                 box.SetWidth(40)
                 box.SetX(105 + x * 40)
@@ -97,65 +97,65 @@ class CircuitUI:
                 box.Hue = 1
                 self.boxlist.append(box)
                 self.gump1.Add(self.boxlist[x + y * 5])
-                text = API.CreateGumpTTFLabel("?", 24, "#FFFFFF", "alagard")
+                text = API.Gumps.CreateGumpTTFLabel("?", 24, "#FFFFFF", "alagard")
                 text.SetX(119 + x * 40)
                 text.SetY(138 + y * 40)
                 self.textlist.append(text)
                 self.gump1.Add(self.textlist[x + y * 5])
 
         # info box
-        infobox = API.CreateGumpColorBox(1, "#000000")
+        infobox = API.Gumps.CreateGumpColorBox(1, "#000000")
         infobox.SetWidth(250)
         infobox.SetHeight(325)
         infobox.SetX(350)
         infobox.SetY(50)
         self.gump1.Add(infobox)
 
-        titlebox = API.CreateGumpColorBox(1, "#292929")
+        titlebox = API.Gumps.CreateGumpColorBox(1, "#292929")
         titlebox.SetWidth(250)
         titlebox.SetHeight(50)
         titlebox.SetX(350)
         titlebox.SetY(20)
         self.gump1.Add(titlebox)
 
-        title1 = API.CreateGumpTTFLabel("Remove Trap", 24, "#FFFFFF", "alagard")
+        title1 = API.Gumps.CreateGumpTTFLabel("Remove Trap", 24, "#FFFFFF", "alagard")
         title1.SetX(355)
         title1.SetY(25)
         self.gump1.Add(title1)
 
-        title2 = API.CreateGumpTTFLabel("Turbo Trainer", 18, "#FFFFFF", "avadonian")
+        title2 = API.Gumps.CreateGumpTTFLabel("Turbo Trainer", 18, "#FFFFFF", "avadonian")
         title2.SetX(420)
         title2.SetY(50)
         self.gump1.Add(title2)
 
-        self.l_size = API.CreateGumpTTFLabel("", 18, "#FFFFFF", "alagard")
+        self.l_size = API.Gumps.CreateGumpTTFLabel("", 18, "#FFFFFF", "alagard")
         self.l_size.SetX(365)
         self.l_size.SetY(75)
         self.gump1.Add(self.l_size)
 
-        self.l_attempt = API.CreateGumpTTFLabel("Attempt #", 18, "#FFFFFF", "alagard")
+        self.l_attempt = API.Gumps.CreateGumpTTFLabel("Attempt #", 18, "#FFFFFF", "alagard")
         self.l_attempt.SetX(365)
         self.l_attempt.SetY(100)
         self.gump1.Add(self.l_attempt)
 
-        self.l_path = API.CreateGumpTTFLabel("Path:", 18, "#FFFFFF", "alagard")
+        self.l_path = API.Gumps.CreateGumpTTFLabel("Path:", 18, "#FFFFFF", "alagard")
         self.l_path.SetX(365)
         self.l_path.SetY(125)
         self.gump1.Add(self.l_path)
 
-        self.l_move = API.CreateGumpTTFLabel("Moving:", 18, "#FFFFFF", "alagard")
+        self.l_move = API.Gumps.CreateGumpTTFLabel("Moving:", 18, "#FFFFFF", "alagard")
         self.l_move.SetX(365)
         self.l_move.SetY(150)
         self.gump1.Add(self.l_move)
 
-        self.l_skill = API.CreateGumpTTFLabel(
+        self.l_skill = API.Gumps.CreateGumpTTFLabel(
             "", 18, "#FFFFFF", "alagard"
         )  # Skill time remaining
         self.l_skill.SetX(365)
         self.l_skill.SetY(200)
         self.gump1.Add(self.l_skill)
 
-        self.skillbar = API.CreateGumpSimpleProgressBar(
+        self.skillbar = API.Gumps.CreateGumpSimpleProgressBar(
             200,
             5,
             "#666666",
@@ -167,7 +167,7 @@ class CircuitUI:
         self.skillbar.SetY(220)
         self.gump1.Add(self.skillbar)
 
-        self.l_skillfraction = API.CreateGumpTTFLabel(
+        self.l_skillfraction = API.Gumps.CreateGumpTTFLabel(
             f"{float(API.GetSkill('Remove Trap').Value):.1f}"
             + "/"
             + str(API.GetSkill("Remove Trap").Cap),
@@ -179,19 +179,19 @@ class CircuitUI:
         self.l_skillfraction.SetY(240)
         self.gump1.Add(self.l_skillfraction)
 
-        self.l_ttime = API.CreateGumpTTFLabel("Time Elapsed:", 18, "#FFFFFF", "alagard")
+        self.l_ttime = API.Gumps.CreateGumpTTFLabel("Time Elapsed:", 18, "#FFFFFF", "alagard")
         self.l_ttime.SetX(365)
         self.l_ttime.SetY(300)
         self.gump1.Add(self.l_ttime)
 
-        self.l_tdisarm = API.CreateGumpTTFLabel(
+        self.l_tdisarm = API.Gumps.CreateGumpTTFLabel(
             "Disarmed Trap #0 in 0s", 18, "#FFFFFF", "alagard"
         )
         self.l_tdisarm.SetX(365)
         self.l_tdisarm.SetY(325)
         self.gump1.Add(self.l_tdisarm)
 
-        self.l_mean = API.CreateGumpTTFLabel(
+        self.l_mean = API.Gumps.CreateGumpTTFLabel(
             "Avg disarm time:", 18, "#FFFFFF", "alagard"
         )
         self.l_mean.SetX(365)
@@ -199,7 +199,7 @@ class CircuitUI:
         self.gump1.Add(self.l_mean)
 
         self.gump1.LayerOrder = self.gump1.LayerOrder.__class__.Over
-        API.AddGump(self.gump1)
+        API.Gumps.AddGump(self.gump1)
 
     def updateBox(self, index, BHue=None, text=None, THue=None, BAlpha=None):
         """

@@ -264,12 +264,12 @@ def _update_gump():
         TEXT_INPUTS = {}
         STATUS_LABELS = []
 
-    g = API.CreateGump(True, True, True)
+    g = API.Gumps.CreateGump(True, True, True)
     g.SetRect(GUMP_X, GUMP_Y, GUMP_WIDTH, 100)
-    bg = API.CreateGumpColorBox(0.7, "#1B1B1B")
+    bg = API.Gumps.CreateGumpColorBox(0.7, "#1B1B1B")
     g.Add(bg.SetRect(0, 0, GUMP_WIDTH, 100))
 
-    title = API.CreateGumpTTFLabel("Caster Training by Dorana", 14, "#FFFFFF", "alagard", "let", GUMP_WIDTH - 20)
+    title = API.Gumps.CreateGumpTTFLabel("Caster Training by Dorana", 14, "#FFFFFF", "alagard", "let", GUMP_WIDTH - 20)
     title.SetPos(10, 8)
     g.Add(title)
 
@@ -282,7 +282,7 @@ def _update_gump():
         for school in to_train:
             current_skill = _get_skill_value(school)
             cap = SPELL_CAPS[school]
-            label = API.CreateGumpTTFLabel(f"{school} - {current_skill:.1f}/{cap}", 12, "#FFFFFF", "alagard", "let", GUMP_WIDTH - 20)
+            label = API.Gumps.CreateGumpTTFLabel(f"{school} - {current_skill:.1f}/{cap}", 12, "#FFFFFF", "alagard", "let", GUMP_WIDTH - 20)
             label.SetPos(10, y)
             g.Add(label)
             STATUS_LABELS.append(label)
@@ -292,20 +292,20 @@ def _update_gump():
         g.SetRect(GUMP_X, GUMP_Y, GUMP_WIDTH, height)
         bg.SetRect(0, 0, GUMP_WIDTH, height)
 
-        header = API.CreateGumpTTFLabel("Skill name", 12, "#FFFFFF", "alagard", "let", 90)
+        header = API.Gumps.CreateGumpTTFLabel("Skill name", 12, "#FFFFFF", "alagard", "let", 90)
         header.SetPos(10, 30)
         g.Add(header)
-        header2 = API.CreateGumpTTFLabel("Target Skill", 12, "#FFFFFF", "alagard", "let", 90)
+        header2 = API.Gumps.CreateGumpTTFLabel("Target Skill", 12, "#FFFFFF", "alagard", "let", 90)
         header2.SetPos(120, 30)
         g.Add(header2)
 
         y = 55
         idx = 0
         for school in SPELL_SCHOOLS:
-            name_label = API.CreateGumpTTFLabel(school, 12, "#FFFFFF", "alagard", "let", 100)
+            name_label = API.Gumps.CreateGumpTTFLabel(school, 12, "#FFFFFF", "alagard", "let", 100)
             name_label.SetPos(10, y)
             g.Add(name_label)
-            tb = API.CreateGumpTextBox("" if SPELL_CAPS[school] <= 0 else str(SPELL_CAPS[school]), 70, 18, False)
+            tb = API.Gumps.CreateGumpTextBox("" if SPELL_CAPS[school] <= 0 else str(SPELL_CAPS[school]), 70, 18, False)
             tb.SetPos(120, y)
             tb.NumbersOnly = True
             g.Add(tb)
@@ -313,12 +313,12 @@ def _update_gump():
             y += 30
             idx += 1
 
-        start_btn = API.CreateSimpleButton("Start", 80, 20)
+        start_btn = API.Gumps.CreateSimpleButton("Start", 80, 20)
         start_btn.SetPos(120, height - 35)
         g.Add(start_btn)
-        API.AddControlOnClick(start_btn, _on_start)
+        API.Gumps.AddControlOnClick(start_btn, _on_start)
 
-    API.AddGump(g)
+    API.Gumps.AddGump(g)
     CONTROL_GUMP = g
 
 

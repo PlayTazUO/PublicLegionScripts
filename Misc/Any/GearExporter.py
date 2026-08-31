@@ -93,9 +93,9 @@ sorted_bonus_attributes = sorted(bonus_attributes.keys())
 w = 575
 h = 0
 
-gump = API.CreateGump(True, True, True)
+gump = API.Gumps.CreateGump(True, True, True)
 
-bg = API.CreateGumpColorBox(0.4, "#D4202020")
+bg = API.Gumps.CreateGumpColorBox(0.4, "#D4202020")
 gump.Add(bg)
 
 output = "Attribute\tValue\tValue2\n"
@@ -104,7 +104,7 @@ y = 15
 # Display resist attributes first
 for name in sorted_resist_attributes:
     value = resist_attributes[name]
-    n = API.CreateGumpLabel(name)
+    n = API.Gumps.CreateGumpLabel(name)
     n.SetY(y)
     n.SetX(15)
     gump.Add(n)
@@ -113,18 +113,18 @@ for name in sorted_resist_attributes:
     output += f"{name}\t"
     if isinstance(value, tuple):
         output += f"{value[0]}\t{value[1]}"
-        v1 = API.CreateGumpLabel(str(value[0]), 44)
+        v1 = API.Gumps.CreateGumpLabel(str(value[0]), 44)
         v1.SetX(165)
         v1.SetY(y)
         gump.Add(v1)
 
-        v2 = API.CreateGumpLabel(str(value[1]), 54)
+        v2 = API.Gumps.CreateGumpLabel(str(value[1]), 54)
         v2.SetX(215)
         v2.SetY(y)
         gump.Add(v2)
     else:
         output += str(value) + "\t"
-        v1 = API.CreateGumpLabel(str(value), 44)
+        v1 = API.Gumps.CreateGumpLabel(str(value), 44)
         v1.SetX(165)
         v1.SetY(y)
         gump.Add(v1)
@@ -141,7 +141,7 @@ output += "\n"  # Add an empty line after resist attributes
 # Display plus attributes
 for name in sorted_plus_attributes:
     value = plus_attributes[name]
-    n = API.CreateGumpLabel(name)
+    n = API.Gumps.CreateGumpLabel(name)
     n.SetY(y)
     n.SetX(15)
     gump.Add(n)
@@ -150,18 +150,18 @@ for name in sorted_plus_attributes:
     output += f"{name}\t"
     if isinstance(value, tuple):
         output += f"{value[0]}\t{value[1]}"
-        v1 = API.CreateGumpLabel(str(value[0]), 44)
+        v1 = API.Gumps.CreateGumpLabel(str(value[0]), 44)
         v1.SetX(165)
         v1.SetY(y)
         gump.Add(v1)
 
-        v2 = API.CreateGumpLabel(str(value[1]), 54)
+        v2 = API.Gumps.CreateGumpLabel(str(value[1]), 54)
         v2.SetX(215)
         v2.SetY(y)
         gump.Add(v2)
     else:
         output += str(value) + "\t"
-        v1 = API.CreateGumpLabel(str(value), 44)
+        v1 = API.Gumps.CreateGumpLabel(str(value), 44)
         v1.SetX(165)
         v1.SetY(y)
         gump.Add(v1)
@@ -178,7 +178,7 @@ output += "\n"  # Add an empty line after plus attributes
 # Display bonus attributes
 for name in sorted_bonus_attributes:
     value = bonus_attributes[name]
-    n = API.CreateGumpLabel(name)
+    n = API.Gumps.CreateGumpLabel(name)
     n.SetY(y)
     n.SetX(15)
     gump.Add(n)
@@ -187,18 +187,18 @@ for name in sorted_bonus_attributes:
     output += f"{name}\t"
     if isinstance(value, tuple):
         output += f"{value[0]}\t{value[1]}"
-        v1 = API.CreateGumpLabel(str(value[0]), 44)
+        v1 = API.Gumps.CreateGumpLabel(str(value[0]), 44)
         v1.SetX(165)
         v1.SetY(y)
         gump.Add(v1)
 
-        v2 = API.CreateGumpLabel(str(value[1]), 54)
+        v2 = API.Gumps.CreateGumpLabel(str(value[1]), 54)
         v2.SetX(215)
         v2.SetY(y)
         gump.Add(v2)
     else:
         output += str(value) + "\t"
-        v1 = API.CreateGumpLabel(str(value), 44)
+        v1 = API.Gumps.CreateGumpLabel(str(value), 44)
         v1.SetX(165)
         v1.SetY(y)
         gump.Add(v1)
@@ -216,7 +216,7 @@ output += "\n"  # Add an empty line after bonus attributes
 for name in sorted(combined_properties.keys()):
     if name not in resist_attributes and name not in plus_attributes and name not in bonus_attributes:
         value = combined_properties[name]
-        n = API.CreateGumpLabel(name)
+        n = API.Gumps.CreateGumpLabel(name)
         n.SetY(y)
         n.SetX(15)
         gump.Add(n)
@@ -225,18 +225,18 @@ for name in sorted(combined_properties.keys()):
         output += f"{name}\t"
         if isinstance(value, tuple):
             output += f"{value[0]}\t{value[1]}"
-            v1 = API.CreateGumpLabel(str(value[0]), 44)
+            v1 = API.Gumps.CreateGumpLabel(str(value[0]), 44)
             v1.SetX(165)
             v1.SetY(y)
             gump.Add(v1)
 
-            v2 = API.CreateGumpLabel(str(value[1]), 54)
+            v2 = API.Gumps.CreateGumpLabel(str(value[1]), 54)
             v2.SetX(215)
             v2.SetY(y)
             gump.Add(v2)
         else:
             output += str(value) + "\t"
-            v1 = API.CreateGumpLabel(str(value), 44)
+            v1 = API.Gumps.CreateGumpLabel(str(value), 44)
             v1.SetX(165)
             v1.SetY(y)
             gump.Add(v1)
@@ -244,7 +244,7 @@ for name in sorted(combined_properties.keys()):
         output += "\n"
         y += 22
 
-textbox = API.CreateGumpTextBox(output, 255, h - 15, True)
+textbox = API.Gumps.CreateGumpTextBox(output, 255, h - 15, True)
 textbox.SetX(300)
 textbox.SetY(15)
 gump.Add(textbox)
@@ -255,4 +255,4 @@ gump.SetWidth(w)
 gump.SetHeight(h)
 gump.CenterXInViewPort()
 gump.CenterYInViewPort()
-API.AddGump(gump)
+API.Gumps.AddGump(gump)

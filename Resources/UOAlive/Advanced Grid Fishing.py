@@ -339,22 +339,22 @@ def BuildControlGump():
     if gump and not gump.IsDisposed:
         gump.Dispose()
 
-    gump = API.CreateGump(True, True)
+    gump = API.Gumps.CreateGump(True, True)
     gump.SetRect(100, 100, GUMP_WIDTH, GUMP_HEIGHT)
 
-    bg = API.CreateGumpColorBox(0.65, "#202020")
+    bg = API.Gumps.CreateGumpColorBox(0.65, "#202020")
     bg.SetRect(0, 0, GUMP_WIDTH, GUMP_HEIGHT)
     gump.Add(bg)
 
-    title = API.CreateGumpTTFLabel("Grid Fisher", 20, "#FFD700")
+    title = API.Gumps.CreateGumpTTFLabel("Grid Fisher", 20, "#FFD700")
     title.SetRect(10, 5, 300, 25)
     gump.Add(title)
 
-    lblStatus = API.CreateGumpTTFLabel(f"Status: {GetStatus()}", 20, "#FFFFFF")
+    lblStatus = API.Gumps.CreateGumpTTFLabel(f"Status: {GetStatus()}", 20, "#FFFFFF")
     lblStatus.SetRect(10, 35, 300, 20)
     gump.Add(lblStatus)
 
-    btnStart = API.CreateSimpleButton("Start", 80, 25)
+    btnStart = API.Gumps.CreateSimpleButton("Start", 80, 25)
     btnStart.SetRect(10, 65, 80, 25)
     gump.Add(btnStart)
 
@@ -368,9 +368,9 @@ def BuildControlGump():
         API.SetSharedVar(sharedFishingActive, True)
         SetStatus("Starting...")
 
-    API.AddControlOnClick(btnStart, onStart)
+    API.Gumps.AddControlOnClick(btnStart, onStart)
 
-    btnStop = API.CreateSimpleButton("Stop", 80, 25)
+    btnStop = API.Gumps.CreateSimpleButton("Stop", 80, 25)
     btnStop.SetRect(110, 65, 80, 25)
     gump.Add(btnStop)
 
@@ -379,9 +379,9 @@ def BuildControlGump():
         SetStatus("Stopped")
         RefreshGump()
 
-    API.AddControlOnClick(btnStop, onStop)
+    API.Gumps.AddControlOnClick(btnStop, onStop)
 
-    btnAll = API.CreateSimpleButton("Chop All", 100, 25)
+    btnAll = API.Gumps.CreateSimpleButton("Chop All", 100, 25)
     btnAll.SetRect(10, 105, 100, 25)
     gump.Add(btnAll)
 
@@ -390,9 +390,9 @@ def BuildControlGump():
         SaveFishPrefs(prefs)
         RefreshGump()
 
-    API.AddControlOnClick(btnAll, onChopAll)
+    API.Gumps.AddControlOnClick(btnAll, onChopAll)
 
-    btnNone = API.CreateSimpleButton("Skip All", 100, 25)
+    btnNone = API.Gumps.CreateSimpleButton("Skip All", 100, 25)
     btnNone.SetRect(120, 105, 100, 25)
     gump.Add(btnNone)
 
@@ -401,30 +401,30 @@ def BuildControlGump():
         SaveFishPrefs(prefs)
         RefreshGump()
 
-    API.AddControlOnClick(btnNone, onSkipAll)
+    API.Gumps.AddControlOnClick(btnNone, onSkipAll)
 
     # --- Resource Counters (Upper Right, vertical stack) ---
     counterX = GUMP_WIDTH - 160
     counterY = 35
     counterSpacing = 20
 
-    lblMiBs = API.CreateGumpTTFLabel(f"MiBs: {sessionMiBs}", 20, "#FFFFFF")
+    lblMiBs = API.Gumps.CreateGumpTTFLabel(f"MiBs: {sessionMiBs}", 20, "#FFFFFF")
     lblMiBs.SetRect(counterX, counterY + 0 * counterSpacing, 140, 20)
     gump.Add(lblMiBs)
 
-    lblNets = API.CreateGumpTTFLabel(f"Nets: {sessionNets}", 20, "#FFFFFF")
+    lblNets = API.Gumps.CreateGumpTTFLabel(f"Nets: {sessionNets}", 20, "#FFFFFF")
     lblNets.SetRect(counterX, counterY + 1 * counterSpacing, 140, 20)
     gump.Add(lblNets)
 
-    lblTMaps = API.CreateGumpTTFLabel(f"TMaps: {sessionTMaps}", 20, "#FFFFFF")
+    lblTMaps = API.Gumps.CreateGumpTTFLabel(f"TMaps: {sessionTMaps}", 20, "#FFFFFF")
     lblTMaps.SetRect(counterX, counterY + 2 * counterSpacing, 140, 20)
     gump.Add(lblTMaps)
 
-    lblPearls = API.CreateGumpTTFLabel(f"Pearls: {sessionPearls}", 20, "#FFFFFF")
+    lblPearls = API.Gumps.CreateGumpTTFLabel(f"Pearls: {sessionPearls}", 20, "#FFFFFF")
     lblPearls.SetRect(counterX, counterY + 3 * counterSpacing, 140, 20)
     gump.Add(lblPearls)
 
-    lblScales = API.CreateGumpTTFLabel(f"Scales: {sessionScales}", 20, "#FFFFFF")
+    lblScales = API.Gumps.CreateGumpTTFLabel(f"Scales: {sessionScales}", 20, "#FFFFFF")
     lblScales.SetRect(counterX, counterY + 4 * counterSpacing, 140, 20)
     gump.Add(lblScales)
 
@@ -444,11 +444,11 @@ def BuildControlGump():
         x = startX + col * colWidth
         y = startY + row * rowHeight
 
-        chk = API.CreateGumpCheckbox("", 0, currentPrefs.get(f["name"], True))
+        chk = API.Gumps.CreateGumpCheckbox("", 0, currentPrefs.get(f["name"], True))
         chk.SetRect(x, y, 20, 20)
         gump.Add(chk)
 
-        lbl = API.CreateGumpTTFLabel(f["name"], 20, "#FFFFFF")
+        lbl = API.Gumps.CreateGumpTTFLabel(f["name"], 20, "#FFFFFF")
         lbl.SetRect(x + 22, y, colWidth - 22, 20)
         gump.Add(lbl)
 
@@ -460,10 +460,10 @@ def BuildControlGump():
                 RefreshGump()
             return handler
 
-        API.AddControlOnClick(chk, makeHandler(f["name"]))
+        API.Gumps.AddControlOnClick(chk, makeHandler(f["name"]))
         fishCheckboxes.append((chk, f["name"]))
 
-    API.AddGump(gump)
+    API.Gumps.AddGump(gump)
 
 # ---------------- MAIN LOOP ----------------
 

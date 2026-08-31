@@ -178,45 +178,45 @@ def _update_gump():
         CONTROL_GUMP.Dispose()
         CONTROL_GUMP = None
 
-    g = API.CreateGump(True, True, False)
+    g = API.Gumps.CreateGump(True, True, False)
     g.SetRect(GUMP_X, GUMP_Y, GUMP_WIDTH, GUMP_HEIGHT)
-    bg = API.CreateGumpColorBox(0.7, "#1B1B1B")
+    bg = API.Gumps.CreateGumpColorBox(0.7, "#1B1B1B")
     bg.SetRect(0, 0, GUMP_WIDTH, GUMP_HEIGHT)
     g.Add(bg)
 
-    title = API.CreateGumpTTFLabel("TileDataExporter", 14, "#FFFFFF", "alagard", "center", GUMP_WIDTH)
+    title = API.Gumps.CreateGumpTTFLabel("TileDataExporter", 14, "#FFFFFF", "alagard", "center", GUMP_WIDTH)
     title.SetPos(0, 6)
     g.Add(title)
 
-    btn = API.CreateSimpleButton("Target Tile", 90, 20)
+    btn = API.Gumps.CreateSimpleButton("Target Tile", 90, 20)
     btn.SetPos(10, 34)
     g.Add(btn)
-    API.AddControlOnClick(btn, _target_tile)
+    API.Gumps.AddControlOnClick(btn, _target_tile)
 
-    path_label = API.CreateGumpTTFLabel("Save Path:", 12, "#FFFFFF", "alagard", "left", 120)
+    path_label = API.Gumps.CreateGumpTTFLabel("Save Path:", 12, "#FFFFFF", "alagard", "left", 120)
     path_label.SetPos(10, 34 + 22)
     g.Add(path_label)
-    path_box = API.CreateGumpTextBox(EXPORT_BASE or "", GUMP_WIDTH - 110, 18, False)
+    path_box = API.Gumps.CreateGumpTextBox(EXPORT_BASE or "", GUMP_WIDTH - 110, 18, False)
     path_box.SetPos(90, 34 + 20)
     g.Add(path_box)
     global PATH_TEXTBOX
     PATH_TEXTBOX = path_box
 
-    exp = API.CreateSimpleButton("Export", 70, 20)
+    exp = API.Gumps.CreateSimpleButton("Export", 70, 20)
     exp.SetPos(200, 34)
     g.Add(exp)
-    API.AddControlOnClick(exp, _export_to_file)
+    API.Gumps.AddControlOnClick(exp, _export_to_file)
 
-    scroll = API.CreateGumpScrollArea(10, 62 + 22, GUMP_WIDTH - 20, GUMP_HEIGHT - 94)
+    scroll = API.Gumps.CreateGumpScrollArea(10, 62 + 22, GUMP_WIDTH - 20, GUMP_HEIGHT - 94)
     g.Add(scroll)
     y = 0
     for line in RESULT_LINES:
-        label = API.CreateGumpTTFLabel(line, 12, "#FFFFFF", "alagard", "left", GUMP_WIDTH - 30)
+        label = API.Gumps.CreateGumpTTFLabel(line, 12, "#FFFFFF", "alagard", "left", GUMP_WIDTH - 30)
         label.SetRect(0, y, GUMP_WIDTH - 30, 16)
         scroll.Add(label)
         y += 18
 
-    API.AddGump(g)
+    API.Gumps.AddGump(g)
     CONTROL_GUMP = g
 
 

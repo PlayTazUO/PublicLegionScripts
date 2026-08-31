@@ -501,7 +501,7 @@ def create_modern_slayer_gump():
     gump_height = 200 + (rows - 1) * 50  # Adjust height based on rows
     
     # Create modern gump without resizing
-    modern_gump = API.CreateModernGump(
+    modern_gump = API.Gumps.CreateModernGump(
         x=200, y=150, width=gump_width, height=gump_height,
         resizable=False, minWidth=300, minHeight=150
     )
@@ -511,25 +511,25 @@ def create_modern_slayer_gump():
     modern_gump.CenterYInViewPort()
     
     # Add background
-    bg = API.CreateGumpColorBox(0.9, "#1a1a1a")
+    bg = API.Gumps.CreateGumpColorBox(0.9, "#1a1a1a")
     bg.SetRect(0, 0, gump_width, gump_height)
     modern_gump.Add(bg)
     
     # Add title
-    title = API.CreateGumpLabel("Modern Slayer Weapon Bar", 0x0481)  # Gold
+    title = API.Gumps.CreateGumpLabel("Modern Slayer Weapon Bar", 0x0481)  # Gold
     title.SetPos(20, 20)
     modern_gump.Add(title)
     
     # Add skill info
     active_skill = detect_active_skill()
-    skill_label = API.CreateGumpTTFLabel(
+    skill_label = API.Gumps.CreateGumpTTFLabel(
         f"Active Skill: {active_skill}", 14, "#00FF00", "alagard"
     )
     skill_label.SetPos(20, 45)
     modern_gump.Add(skill_label)
     
     # Add status label
-    status_label = API.CreateGumpTTFLabel(
+    status_label = API.Gumps.CreateGumpTTFLabel(
         "Status: Ready", 14, "#FFFFFF", "alagard"
     )  # White TTF
     status_label.SetPos(20, 70)
@@ -553,7 +553,7 @@ def create_modern_slayer_gump():
         
         # Create button background with different colors based on slayer type
         button_color = get_slayer_color(item.slayer)
-        button_bg = API.CreateGumpColorBox(0.8, button_color)
+        button_bg = API.Gumps.CreateGumpColorBox(0.8, button_color)
         button_bg.SetRect(x_pos, y_pos, 90, 40)
         modern_gump.Add(button_bg)
         
@@ -561,7 +561,7 @@ def create_modern_slayer_gump():
         display_name = (
             item.name[:18] + "..." if len(item.name) > 18 else item.name
         )
-        button_label = API.CreateGumpTTFLabel(
+        button_label = API.Gumps.CreateGumpTTFLabel(
             display_name, 11, "#000000", "alagard"
         )
         button_label.SetPos(x_pos + 5, y_pos + 20)
@@ -569,14 +569,14 @@ def create_modern_slayer_gump():
         
         # Add slayer type indicator with TTF
         slayer_name = get_slayer_name(item.slayer)
-        slayer_label = API.CreateGumpTTFLabel(
+        slayer_label = API.Gumps.CreateGumpTTFLabel(
             slayer_name, 10, "#00FF00", "alagard"
         )
         slayer_label.SetPos(x_pos + 5, y_pos + 5)
         modern_gump.Add(slayer_label)
         
         # Make the button background clickable
-        API.AddControlOnClick(
+        API.Gumps.AddControlOnClick(
             button_bg, lambda item=item: equip_slayer_weapon(item), True
         )
         
@@ -584,18 +584,18 @@ def create_modern_slayer_gump():
         slayer_buttons.append((item, button_bg, button_label, slayer_label))
     
     # Add close button
-    close_bg = API.CreateGumpColorBox(0.8, "#E74C3C")  # Red
+    close_bg = API.Gumps.CreateGumpColorBox(0.8, "#E74C3C")  # Red
     close_bg.SetRect(gump_width - 50, 20, 30, 30)
     modern_gump.Add(close_bg)
     
-    close_label = API.CreateGumpTTFLabel("X", 14, "#FFFFFF", "alagard") 
+    close_label = API.Gumps.CreateGumpTTFLabel("X", 14, "#FFFFFF", "alagard") 
     close_label.SetPos(gump_width - 40, 30)
     modern_gump.Add(close_label)
     
-    API.AddControlOnClick(close_bg, close_gump, True)
+    API.Gumps.AddControlOnClick(close_bg, close_gump, True)
     
     # Display the gump
-    API.AddGump(modern_gump)
+    API.Gumps.AddGump(modern_gump)
     API.SysMsg(f"Modern Slayer bar created with {len(slayer_items)} weapons!", 946)
 
 

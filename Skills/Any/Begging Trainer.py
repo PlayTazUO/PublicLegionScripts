@@ -36,7 +36,7 @@ class InfoGump:
         self.label = API.Gumps.CreateGumpTTFLabel("Get close to a beggable target", 18, aligned="center", maxWidth=500)
         self.label.SetRect(10, 10, 500, 40)
         self.gump.Add(self.label)
-        API.AddGump(self.gump)
+        API.Gumps.AddGump(self.gump)
     
     def update_status(self, text):
         self.label.Text = text

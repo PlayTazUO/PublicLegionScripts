@@ -84,21 +84,21 @@ def trainMageryNoResist():
     API.Pause(2.5)  
     manaCheck()
 
-gump = API.CreateGump()
+gump = API.Gumps.CreateGump()
 gump.SetRect(100, 100, 400, 100)
-bg = API.CreateGumpColorBox(0.7, "#212121")
+bg = API.Gumps.CreateGumpColorBox(0.7, "#212121")
 bg.SetRect(0, 0, 400, 100)
 gump.Add(bg)
 
-label = API.CreateGumpTTFLabel("", 24, "#FF8800", aligned="center", maxWidth=400)
+label = API.Gumps.CreateGumpTTFLabel("", 24, "#FF8800", aligned="center", maxWidth=400)
 gump.Add(label)
-API.AddGump(gump)
+API.Gumps.AddGump(gump)
 
-spell = API.CreateGumpTTFLabel("Training Magery...", 24, "#FF8800", aligned="center", maxWidth=400)
+spell = API.Gumps.CreateGumpTTFLabel("Training Magery...", 24, "#FF8800", aligned="center", maxWidth=400)
 spell.SetY(35)
 gump.Add(spell)
 
-mageval = API.CreateGumpTTFLabel(f"Magery: {Magery.Value}", 24, "#FF8800", aligned="center", maxWidth=400)
+mageval = API.Gumps.CreateGumpTTFLabel(f"Magery: {Magery.Value}", 24, "#FF8800", aligned="center", maxWidth=400)
 mageval.SetY(70)
 gump.Add(mageval)
 
