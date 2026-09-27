@@ -1,0 +1,467 @@
+"""
+Taming Trainer - Legion Scripting conversion
+
+Original Author: Aga (uosteam script)
+Converted to Razor Enhanced by: TheWarDoctor95 - March 19, 2019
+Converted to Legion Scripting (TazUO) API by: Claude
+
+Description:
+    Tames nearby animals to train Taming to GM.
+
+Notes on the conversion:
+    - The original relied on Razor Enhanced's `Scripts.glossary.tameables` module to
+      look up which body graphics were tameable and their taming difficulty. Legion has
+      no equivalent, so a curated TAMEABLES table (body graphic -> difficulty) is embedded
+      below. See problems.md for details.
+    - Following/tracking the animal now uses Legion's built in pathfinding instead of the
+      manual tile-by-tile walking in the original.
+    - Razor's Timer.Create / Timer.Check helpers are re-implemented in pure Python.
+"""
+
+import API
+import time
+import System
+from System import UInt16
+
+## Script options ##
+# Change to the name that you want to rename the tamed animals to
+renameTamedAnimalsTo = 'Z'
+# Add any name of pets to ignore
+petsToIgnore = [
+    renameTamedAnimalsTo,
+    # My animals 
+    'Benny', 'Saphira', 'Your Worst Nightmare', 'B Two', 'x', 'b two',
+    'buddy',
+    # Viper's animals
+    'Murder Pony', 'Toothless', 'A unicorn (Paragon)', 'A Ki-rin (Paragon)'
+]
+# Change to the number of followers you'd like to keep.
+# The script will auto-release the most recently tamed animal if the follower number exceeds this number
+# Some animals have a follower count greater than one, which may cause them to be released if this number is not set high enough
+numberOfFollowersToKeep = 0
+# Set to the maximum number of times to attempt to tame a single animal. 0 == attempt until tamed
+maximumTameAttempts = 8
+# Set the minimum taming difficulty to use when finding animals to tame
+minimumTamingDifficulty = 67
+# Set this to how you would like to heal your character if they take damage
+# Options are:
+# 'Healing' = use bandages
+# 'Magery' = uses the Heal and Greater Heal ability depending on how much health is missing
+# 'None' = do not auto-heal
+healUsing = 'Magery'
+# True or False to use Peacemaking if needed
+enablePeacemaking = False
+# True or False to track (pathfind to) the animal being tamed
+enableFollowAnimal = True
+# Change depending on the latency to your UO shard
+journalEntryDelayMilliseconds = 100
+targetClearDelayMilliseconds = 100
+
+# Pet release settings (used when Followers exceeds numberOfFollowersToKeep).
+# These match the original Razor Enhanced script; they may need adjusting per shard/client.
+releaseContextEntry = 9          # Context menu entry for "Release"
+releaseConfirmGumpId = 0x5C2226AE # Confirmation gump id
+releaseConfirmButton = 2         # "Yes / OK" button on the confirmation gump
+
+# Script timers (milliseconds, matching the original)
+noAnimalsToTrainTimerMilliseconds = 10000
+catchUpToAnimalTimerMilliseconds = 20000
+animalTamingTimerMilliseconds = 13000
+peacemakingTimerMilliseconds = 10000
+bandageTimerMilliseconds = 5000
+
+# Instrument graphics searched when Peacemaking (lute, harps, drum, tambourines)
+INSTRUMENT_GRAPHICS = [0x0EB1, 0x0EB2, 0x0EB3, 0x0E9C, 0x0E9D, 0x0E9E]
+
+# --------------------------------------------------------------------------- #
+# Tameable animals: body graphic -> taming difficulty (minimum skill to tame). #
+# This replaces Razor Enhanced's Scripts.glossary.tameables lookup.            #
+# The list covers the common tameables; add/adjust entries for your shard.     #
+# --------------------------------------------------------------------------- #
+TAMEABLES = {
+    0x00D0: 0,    # Chicken
+    0x00CD: 0,    # Rabbit
+    0x00CC: 29,   # Horse (brown)
+    0x00C8: 29,   # Horse (grey)
+    0x00E2: 29,   # Horse (tan)
+    0x00E4: 29,   # Horse (dark)
+    0x00CB: 29,   # Pig
+    0x00CF: 11,   # Sheep
+    0x00D8: 29,   # Cow (brown)
+    0x00E7: 29,   # Cow (spotted)
+    0x00D9: 0,    # Dog
+    0x00C9: 0,    # Cat
+    0x00DC: 53,   # Llama
+    0x0123: 29,   # Pack horse
+    0x0124: 29,   # Pack llama
+    0x00DA: 71,   # Ostard (desert)
+    0x00DB: 83,   # Frenzied ostard
+    0x00D2: 53,   # Ostard (forest)
+    0x00EA: 59,   # Great hart
+    0x00ED: 35,   # Hind (deer)
+    0x0122: 47,   # Boar
+    0x00A7: 41,   # Brown bear
+    0x00D3: 53,   # Black bear
+    0x00D4: 71,   # Grizzly bear
+    0x00D5: 83,   # Polar bear
+    0x00D6: 47,   # Panther
+    0x00C3: 41,   # Cougar
+    0x0062: 29,   # Mountain goat
+    0x00E1: 41,   # Timber wolf
+    0x0019: 47,   # Grey wolf
+    0x001B: 47,   # Grey wolf (alt)
+    0x00DD: 59,   # Walrus
+    0x001D: 41,   # Gorilla
+    0x0015: 71,   # Giant serpent
+    0x00CE: 35,   # Eagle / bird of prey
+    0x003D: 71,   # Frost spider
+    0x0034: 71,   # Snow leopard
+    0x00D1: 53,   # Slime? (varies) -- adjust per shard
+    0x007A: 96,   # Unicorn
+    0x0084: 96,   # Ki-Rin
+    0x0074: 96,   # Nightmare
+    0x003C: 84,   # Drake
+    0x003B: 94,   # Dragon
+    0x0091: 84,   # Sea serpent
+    0x00f8: 68,   # Gaman
+    0x00e8: 71,   # Bull Grey
+    0x00e9: 71,   # Bull Spotted
+}
+
+
+def get_animal_ids_at_or_over_difficulty(min_difficulty):
+    """Return the set of body graphics whose taming difficulty is >= min_difficulty."""
+    return set(g for g, diff in TAMEABLES.items() if diff >= min_difficulty)
+
+
+# --------------------------------------------------------------------------- #
+# Simple timer helpers replacing Razor Enhanced's Timer.Create / Timer.Check   #
+# A timer is "running" (Check == True) until the requested duration elapses.    #
+# --------------------------------------------------------------------------- #
+_timers = {}
+
+
+def timer_create(name, milliseconds):
+    _timers[name] = time.time() + (milliseconds / 1000.0)
+
+
+def timer_check(name):
+    """True while the timer is still counting down, False once it has expired."""
+    return _timers.get(name, 0) > time.time()
+
+
+def find_instrument():
+    """Find a musical instrument in the player's backpack for Peacemaking."""
+    for graphic in INSTRUMENT_GRAPHICS:
+        item = API.FindType(graphic, API.Backpack)
+        if item:
+            return item
+    return None
+
+
+def find_animal_to_tame(tameable_graphics):
+    """
+    Finds the nearest tameable animal nearby that is not on the ignore list
+    and not in the petsToIgnore name list.
+    """
+    best = None
+    best_distance = 9999
+    target_hues = System.Array[UInt16]([0])
+
+    # for mobile in API.GetAllMobiles(distance=24, hues=target_hues):
+    for mobile in API.GetAllMobiles(distance=18, hues=target_hues, isHuman=False, isGhost=False):
+        if mobile is None:
+            continue
+        if mobile.Graphic not in tameable_graphics:
+            continue   
+        if mobile.Name in petsToIgnore:
+            continue
+        if API.OnIgnoreList(mobile.Serial):
+            continue
+        if mobile.Distance < best_distance:
+            best = mobile
+            best_distance = mobile.Distance
+    if best is not None:
+     # Print to system message chat to chat to verify hue
+     #API.SysMsg(f"Selected Tameable: {best.Name} | Hue: {best.Hue}") 
+
+    return best
+
+
+def follow_mobile(mobile, max_distance):
+    """
+    Pathfind towards the animal. Returns True if we reached (or are within)
+    max_distance, False if we appear to be stuck / could not get there in time.
+    """
+    deadline = time.time() + (catchUpToAnimalTimerMilliseconds / 1000.0)
+
+    while not API.StopRequested and time.time() < deadline:
+        current = API.FindMobile(mobile.Serial)
+        if current is None:
+            return True  # animal gone; let the main loop pick a new one
+        if current.Distance <= max_distance:
+            return True
+        API.PathfindEntity(current.Serial, max_distance, False)
+        API.Pause(0.25)
+
+    return False
+
+
+def heal_if_needed():
+    """Auto-heal the player using the configured method."""
+    if API.Player.Hits >= API.Player.HitsMax:
+        return
+
+    if healUsing == 'Healing' and not timer_check('bandageTimer'):
+        if API.BandageSelf():
+            timer_create('bandageTimer', bandageTimerMilliseconds)
+    elif healUsing == 'Magery' and not timer_check('healSpellTimer'):
+        if (API.Player.HitsMax - API.Player.Hits) > 30:
+            API.CastSpell('Greater Heal')
+            timer_create('healSpellTimer', 3000)
+        else:
+            API.CastSpell('Heal')
+            timer_create('healSpellTimer', 1500)
+        if API.WaitForTarget('beneficial', 2):
+            API.TargetSelf()
+
+
+def peacemake_hostiles():
+    """Peacemake any nearby enemies that are in war mode (mirrors the original)."""
+    enemies = API.NearestMobiles(
+        [API.Notoriety.Gray, API.Notoriety.Criminal,
+         API.Notoriety.Enemy, API.Notoriety.Murderer], 12)
+
+    enemy_to_calm = None
+    for enemy in enemies:
+        if enemy.InWarMode:
+            enemy_to_calm = enemy
+            break
+
+    while enemy_to_calm is not None and not API.StopRequested:
+        if not timer_check('peacemakingTimer'):
+            if API.HasTarget():
+                API.CancelTarget()
+            API.Pause(targetClearDelayMilliseconds / 1000.0)
+
+            API.UseSkill('Peacemaking')
+            API.Pause(journalEntryDelayMilliseconds / 1000.0)
+
+            if API.InJournal('What instrument shall you play?'):
+                instrument = find_instrument()
+                if instrument is None:
+                    API.HeadMsg('No instruments to peacemake with.', API.Player, 1100)
+                    return
+                if API.WaitForTarget('any', 2):
+                    API.Target(instrument.Serial)
+
+            if API.InJournal('Whom do you wish to calm?'):
+                if API.WaitForTarget('any', 2):
+                    API.Target(enemy_to_calm.Serial)
+
+            timer_create('peacemakingTimer', peacemakingTimerMilliseconds)
+
+        # Re-scan for enemies still in war mode
+        enemy_to_calm = None
+        for enemy in API.NearestMobiles(
+                [API.Notoriety.Gray, API.Notoriety.Criminal,
+                 API.Notoriety.Enemy, API.Notoriety.Murderer], 12):
+            if enemy.InWarMode:
+                enemy_to_calm = enemy
+                break
+
+        API.Pause(0.05)
+
+    if API.Player.InWarMode:
+        API.SetWarMode(False)
+
+
+def peacemake_animal(animal):
+    """Keep the animal being tamed calm."""
+    if API.Player.InWarMode:
+        API.SetWarMode(False)
+
+    if not timer_check('peacemakingTimer'):
+        if API.HasTarget():
+            API.CancelTarget()
+        API.Pause(targetClearDelayMilliseconds / 1000.0)
+
+        API.UseSkill('Peacemaking')
+        API.Pause(journalEntryDelayMilliseconds / 1000.0)
+
+        if API.InJournal('What instrument shall you play?'):
+            instrument = find_instrument()
+            if instrument is None:
+                API.HeadMsg('No instruments to peacemake with.', API.Player, 1100)
+                return
+            if API.WaitForTarget('any', 2):
+                API.Target(instrument.Serial)
+
+        if API.WaitForTarget('any', 2):
+            API.Target(animal.Serial)
+
+        timer_create('peacemakingTimer', peacemakingTimerMilliseconds)
+
+
+def release_animal(serial):
+    """Release a recently tamed animal to stay under the follower cap."""
+    API.ContextMenu(serial, releaseContextEntry)
+    if API.WaitForGump(releaseConfirmGumpId, 10):
+        API.ReplyGump(releaseConfirmButton, releaseConfirmGumpId)
+
+
+def train_animal_taming():
+    """Trains Taming to GM."""
+    taming = API.GetSkill('Taming')
+    if taming is None:
+        API.SysMsg('Could not read Taming skill!', 65)
+        return
+    if taming.Base >= taming.Cap:
+        API.SysMsg("You've already maxed out Taming!", 65)
+        return
+
+    tameable_graphics = get_animal_ids_at_or_over_difficulty(minimumTamingDifficulty)
+
+    # Initialize variables
+    animal_being_tamed = None
+    tame_handled = False
+    tame_ongoing = False
+    times_tried = 0
+
+    # Initialize skill timers (set to 1ms so they're immediately expired == ready)
+    timer_create('animalTamingTimer', 1)
+    if enablePeacemaking:
+        timer_create('peacemakingTimer', 1)
+    if healUsing == 'Healing':
+        timer_create('bandageTimer', 1)
+    elif healUsing == 'Magery':
+        timer_create('healSpellTimer', 1)
+
+    # Initialize the journal and ignore list
+    API.ClearJournal()
+    API.ClearIgnoreList()
+
+    # Toggle war mode to make sure we won't kill the animal being tamed
+    API.SetWarMode(True)
+    API.SetWarMode(False)
+
+    while not API.StopRequested and not API.Player.IsDead:
+        taming = API.GetSkill('Taming')
+        if taming.Base >= taming.Cap:
+            break
+
+        # If our current animal was killed or wandered out of the client's view
+        if animal_being_tamed is not None and API.FindMobile(animal_being_tamed.Serial) is None:
+            API.SysMsg('Animal was killed or disappeared')
+            animal_being_tamed = None
+
+        # Give up on an animal after too many attempts
+        if maximumTameAttempts != 0 and times_tried > maximumTameAttempts and animal_being_tamed is not None:
+            API.HeadMsg('Tried more than %i times to tame. Ignoring animal' % maximumTameAttempts,
+                        animal_being_tamed.Serial, 1100)
+            API.IgnoreObject(animal_being_tamed.Serial)
+            animal_being_tamed = None
+            times_tried = 0
+
+        # Healing / peacemaking of hostiles when we take damage
+        if API.Player.Hits != API.Player.HitsMax:
+            if healUsing != 'None':
+                heal_if_needed()
+            if enablePeacemaking:
+                peacemake_hostiles()
+
+        # If there is no animal being tamed, try to find one
+        if animal_being_tamed is None:
+            animal_being_tamed = find_animal_to_tame(tameable_graphics)
+            if animal_being_tamed is None:
+                API.Pause(1)
+                continue
+            else:
+                API.HeadMsg('Found animal to tame', animal_being_tamed.Serial, 90)
+        # Distance handling
+        max_distance_to_target = 5 if tame_ongoing else 2
+
+        if animal_being_tamed.Distance > 30:
+            API.SysMsg('Animal moved too far away, ignoring for now', 1100)
+            animal_being_tamed = None
+            continue
+        elif animal_being_tamed.Distance > max_distance_to_target:
+            if enableFollowAnimal:
+                if not follow_mobile(animal_being_tamed, max_distance_to_target):
+                    API.HeadMsg('Player stuck!', API.Player, 1100)
+                    return
+                refreshed = API.FindMobile(animal_being_tamed.Serial)
+                if refreshed is None:
+                    animal_being_tamed = None
+                    continue
+                animal_being_tamed = refreshed
+            else:
+                API.HeadMsg('Not close enough!', animal_being_tamed.Serial, 34)
+
+        # Keep the animal calm if peacemaking is enabled and it's aggressive
+        if enablePeacemaking and animal_being_tamed is not None and animal_being_tamed.InWarMode:
+            peacemake_animal(animal_being_tamed)
+
+        # Attempt the tame if we're ready and not mid-attempt
+        if not tame_ongoing and not timer_check('animalTamingTimer'):
+            if API.HasTarget():
+                API.CancelTarget()
+            API.Pause(targetClearDelayMilliseconds / 1000.0)
+
+            API.UseSkill('Taming')
+            if API.WaitForTarget('any', 2):
+                API.Target(animal_being_tamed.Serial)
+                API.Pause(journalEntryDelayMilliseconds / 1000.0)
+
+            if API.InJournal('Tame which animal?'):
+                times_tried += 1
+                timer_create('animalTamingTimer', animalTamingTimerMilliseconds)
+                tame_ongoing = True
+            else:
+                continue
+
+        # Evaluate the result of an in-progress tame
+        if tame_ongoing:
+            if (API.InJournal('It seems to accept you as master.') or
+                    API.InJournal("That wasn't even challenging.")):
+                # Successfully tamed
+                if animal_being_tamed.Name != renameTamedAnimalsTo:
+                    API.Rename(animal_being_tamed.Serial, renameTamedAnimalsTo)
+                if API.Player.Followers > numberOfFollowersToKeep:
+                    release_animal(animal_being_tamed.Serial)
+                API.IgnoreObject(animal_being_tamed.Serial)
+                animal_being_tamed = None
+                times_tried = 0
+                tame_handled = True
+            elif (API.InJournal('You fail to tame the creature.') or
+                    API.InJournal('You must wait a few moments to use another skill.')):
+                tame_handled = True
+            elif (API.InJournal('That is too far away.') or
+                    API.InJournal('You are too far away to continue taming.') or
+                    API.InJournal('Someone else is already taming this')):
+                animal_being_tamed = None
+                times_tried = 0
+                timer_create('animalTamingTimer', 1)
+                tame_handled = True
+            elif (API.InJournal('You have no chance of taming this creature') or
+                    API.InJournal('Target cannot be seen') or
+                    API.InJournal('This animal has had too many owners and is too upset for you to tame.') or
+                    API.InJournal('That animal looks tame already.') or
+                    API.InJournal('You do not have a clear path to the animal you are taming')):
+                API.IgnoreObject(animal_being_tamed.Serial)
+                animal_being_tamed = None
+                times_tried = 0
+                timer_create('animalTamingTimer', 1)
+                tame_handled = True
+
+            if tame_handled:
+                API.ClearJournal()
+                tame_handled = False
+                tame_ongoing = False
+
+        # Small pause so the loop doesn't consume as much CPU
+        API.Pause(0.05)
+
+
+# Start Taming
+train_animal_taming()
