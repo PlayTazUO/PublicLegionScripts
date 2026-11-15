@@ -76,8 +76,9 @@ class CircuitUI:
         bg = API.Gumps.CreateGumpColorBox(0, "#575757FF")
         bg.SetWidth(w)
         bg.SetHeight(h)
-        self.gump1.SetX(gump.GetX())
-        self.gump1.SetY(gump.GetY())
+        vp = API.GetViewportBounds()
+        self.gump1.SetX(vp.X + max(0, (vp.Width - w) // 2))
+        self.gump1.SetY(vp.Y + max(0, (vp.Height - h) // 2))
         self.gump1.Add(bg)
 
         #    0,  1,   2,  3,  4
