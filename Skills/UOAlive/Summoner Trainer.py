@@ -3,6 +3,7 @@ import API
 CHECK_INTERVAL = 0.5
 TARGET_TIMEOUT = 2.5
 Goal = 100
+VERSION = "1.7.0"
 
 def centered_label(text, size, color="#FFFFFF"):
     return API.Gumps.CreateGumpTTFLabel(
@@ -12,39 +13,145 @@ def centered_label(text, size, color="#FFFFFF"):
         aligned="center",
     )
 
-def add_popup_background(gump, width, height):
-    background = API.Gumps.CreateGumpColorBox(0.55, "#FF333333")
-    background.SetRect(0, 0, width, height)
-    gump.Add(background)
+def add_tiled_part(gump, graphic, x, y, width, height, hue=0):
+    part = API.Gumps.CreateTiledGumpPic(
+        graphic,
+        max(1, width),
+        max(1, height),
+        hue,
+    )
+    part.SetX(x)
+    part.SetY(y)
+    gump.Add(part)
 
-def add_milestone_skill_status(gump, width, y):
+
+def get_size(control, default_w=24, default_h=24):
+    width = control.GetWidth() if hasattr(control, "GetWidth") else default_w
+    height = control.GetHeight() if hasattr(control, "GetHeight") else default_h
+    return (
+        width if width > 0 else default_w,
+        height if height > 0 else default_h,
+    )
+
+
+def add_popup_background(gump, width, height):
+    # Use the nine-piece scroll frame while preserving each popup's dimensions.
+    top_left = API.Gumps.CreateGumpPic(0x2436, 0, 0)
+    top_right = API.Gumps.CreateGumpPic(0x2438, 0, 0)
+    bottom_left = API.Gumps.CreateGumpPic(0x243C, 0, 0)
+    bottom_right = API.Gumps.CreateGumpPic(0x243E, 0, 0)
+
+    left_width, top_height = get_size(top_left, 24, 24)
+    right_width, _ = get_size(top_right, 24, 24)
+    _, bottom_height = get_size(bottom_left, 24, 24)
+
+    top_right.SetX(width - right_width)
+    top_right.SetY(0)
+    bottom_left.SetX(0)
+    bottom_left.SetY(height - bottom_height)
+    bottom_right.SetX(width - right_width)
+    bottom_right.SetY(height - bottom_height)
+
+    inner_width = max(1, width - left_width - right_width)
+    inner_height = max(1, height - top_height - bottom_height)
+
+    # Add the tiled center and four edges first so the corners sit above them.
+    add_tiled_part(gump, 0x243A, left_width, top_height, inner_width, inner_height)
+    add_tiled_part(gump, 0x2437, left_width, 0, inner_width, top_height)
+    add_tiled_part(
+        gump,
+        0x243D,
+        left_width,
+        height - bottom_height,
+        inner_width,
+        bottom_height,
+    )
+    add_tiled_part(gump, 0x2439, 0, top_height, left_width, inner_height)
+    add_tiled_part(
+        gump,
+        0x243B,
+        width - right_width,
+        top_height,
+        right_width,
+        inner_height,
+    )
+
+    gump.Add(top_left)
+    gump.Add(top_right)
+    gump.Add(bottom_left)
+    gump.Add(bottom_right)
+
+BASE_SKILLS = [
+    ("Magery", "Magery"),
+    ("Evaluating Intelligence", "Eval"),
+    ("Mysticism", "Mysticism"),
+    ("Spellweaving", "Spellweaving"),
+    ("Meditation", "Meditation"),
+    ("Focus", "Focus"),
+]
+
+def add_milestone_skill_status(gump, width, y, required_skills):
     necromancy = API.GetSkill("Necromancy")
     spirit_speak = API.GetSkill("Spirit Speak")
+    current_values = {}
+    value_parts = []
+    unmet = []
+
+    for skill_name, short_name in BASE_SKILLS:
+        skill = API.GetSkill(skill_name)
+        if skill:
+            current_values[skill_name] = skill.Value
+            value_parts.append(short_name + " " + str(skill.Value))
+        else:
+            current_values[skill_name] = None
+            value_parts.append(short_name + " ?")
+
+    for skill_name, minimum in required_skills:
+        skill_value = current_values.get(skill_name)
+        if skill_value is None:
+            unmet.append(skill_name + " unreadable")
+        elif skill_value < minimum:
+            unmet.append(skill_name + " below " + str(minimum))
 
     if not necromancy or not spirit_speak:
-        status_lines = [
-            "Could not verify Necromancy and Spirit Speak requirements.",
-            "Both skills must be exactly 0 to benefit from these milestones.",
-        ]
-        status_color = "#FFFF5555"
-    elif necromancy.Value > 0 or spirit_speak.Value > 0:
-        status_lines = [
-            "Necromancy: " + str(necromancy.Value) +
-            " | Spirit Speak: " + str(spirit_speak.Value),
-            "These milestone benefits require both skills to be ZERO.",
-        ]
-        status_color = "#FFFF5555"
+        necro_text = str(necromancy.Value) if necromancy else "?"
+        spirit_text = str(spirit_speak.Value) if spirit_speak else "?"
+        unmet.append("Necromancy/Spirit Speak unreadable")
     else:
-        status_lines = [
-            "Necromancy: 0 | Spirit Speak: 0",
-            "Both requirements are met; you can benefit from this milestone.",
-        ]
-        status_color = "#FF77FF77"
+        necro_text = str(necromancy.Value)
+        spirit_text = str(spirit_speak.Value)
+        if necromancy.Value != 0 or spirit_speak.Value != 0:
+            unmet.append("Necromancy and Spirit Speak must both be 0")
+
+    status_color = "#FF77FF77" if not unmet else "#FFFF5555"
+    status_lines = [
+        "Base skills: " + " | ".join(value_parts),
+        "Necromancy: " + necro_text + " | Spirit Speak: " + spirit_text,
+    ]
+    if unmet:
+        status_lines.append("Benefits unavailable: " + "; ".join(unmet))
+    else:
+        status_lines.append("Milestone requirements met; benefits are available.")
 
     for index, text in enumerate(status_lines):
-        status_label = centered_label(text, 16, status_color)
-        status_label.SetRect(15, y + index * 25, width - 30, 24)
+        status_label = centered_label(text, 14, status_color)
+        status_label.SetRect(15, y + index * 23, width - 30, 22)
         gump.Add(status_label)
+
+def heal_if_needed():
+    if API.Player.HitsMax <= 0:
+        return False
+
+    if API.Player.Hits * 100 >= API.Player.HitsMax * 75:
+        return False
+
+    if API.Player.Mana < 11:
+        wait_for_full_mana()
+
+    if not API.StopRequested and API.Player.Mana >= 11:
+        cast_on_self("Greater Heal", "beneficial")
+
+    return True
 
 def wait_for_full_mana():
     regen_gump = API.Gumps.CreateGump(False, False, False)
@@ -77,8 +184,7 @@ def cast_on_self(spell_name, target_type):
     else:
         API.CancelPreTarget()
 
-def train_spellweaving_band(stop_at, spell_name, min_mana, target_self=False,
-                            heal_below_75=False):
+def train_spellweaving_band(stop_at, spell_name, min_mana, target_self=False):
     while not API.StopRequested:
         spellweaving = API.GetSkill("Spellweaving")
         if not spellweaving:
@@ -97,11 +203,9 @@ def train_spellweaving_band(stop_at, spell_name, min_mana, target_self=False,
             API.SysMsg("Spellweaving reached " + str(min(stop_at, Goal)) + ".0.")
             break
 
-        if heal_below_75 and API.Player.Hits * 100 < API.Player.HitsMax * 75:
-            if API.Player.Mana < 11:
-                wait_for_full_mana()
-            else:
-                cast_on_self("Greater Heal", "beneficial")
+        if heal_if_needed():
+            API.Pause(CHECK_INTERVAL)
+            continue
         elif API.Player.Mana < min_mana:
             wait_for_full_mana()
         elif target_self:
@@ -124,8 +228,8 @@ def show_spellweaving_50_milestone():
         milestone_notice["acknowledged"] = True
 
     milestone_gump = API.Gumps.CreateGump(True, True, False)
-    milestone_gump.SetRect(0, 0, 900, 370)
-    add_popup_background(milestone_gump, 900, 370)
+    milestone_gump.SetRect(0, 0, 900, 390)
+    add_popup_background(milestone_gump, 900, 390)
     milestone_gump.CenterXInViewPort()
     milestone_gump.CenterYInViewPort()
 
@@ -185,10 +289,15 @@ def show_spellweaving_50_milestone():
     milestone_reminder.SetRect(15, 242, 870, 28)
     milestone_gump.Add(milestone_reminder)
 
-    add_milestone_skill_status(milestone_gump, 900, 275)
+    add_milestone_skill_status(
+        milestone_gump,
+        900,
+        270,
+        [("Mysticism", 50), ("Spellweaving", 50)],
+    )
 
     milestone_button = API.Gumps.CreateSimpleButton("Continue", 140, 32)
-    milestone_button.SetPos(380, 330)
+    milestone_button.SetPos(380, 350)
     milestone_button.SetBackgroundColor(35, 110, 45)
     milestone_gump.Add(milestone_button)
     API.Gumps.AddControlOnClick(milestone_button, acknowledge_milestone)
@@ -213,8 +322,8 @@ def show_spellweaving_100_milestone():
         milestone_notice["acknowledged"] = True
 
     milestone_gump = API.Gumps.CreateGump(True, True, False)
-    milestone_gump.SetRect(0, 0, 940, 420)
-    add_popup_background(milestone_gump, 940, 420)
+    milestone_gump.SetRect(0, 0, 940, 430)
+    add_popup_background(milestone_gump, 940, 430)
     milestone_gump.CenterXInViewPort()
     milestone_gump.CenterYInViewPort()
 
@@ -282,10 +391,15 @@ def show_spellweaving_100_milestone():
     milestone_line6.SetRect(15, 276, 910, 28)
     milestone_gump.Add(milestone_line6)
 
-    add_milestone_skill_status(milestone_gump, 940, 310)
+    add_milestone_skill_status(
+        milestone_gump,
+        940,
+        310,
+        [(skill_name, 100) for skill_name, _ in BASE_SKILLS],
+    )
 
     milestone_button = API.Gumps.CreateSimpleButton("Continue", 140, 32)
-    milestone_button.SetPos(400, 375)
+    milestone_button.SetPos(400, 390)
     milestone_button.SetBackgroundColor(35, 110, 45)
     milestone_gump.Add(milestone_button)
     API.Gumps.AddControlOnClick(milestone_button, acknowledge_milestone)
@@ -310,8 +424,8 @@ def show_spellweaving_120_milestone():
         milestone_notice["acknowledged"] = True
 
     milestone_gump = API.Gumps.CreateGump(True, True, False)
-    milestone_gump.SetRect(0, 0, 940, 470)
-    add_popup_background(milestone_gump, 940, 470)
+    milestone_gump.SetRect(0, 0, 940, 490)
+    add_popup_background(milestone_gump, 940, 490)
     milestone_gump.CenterXInViewPort()
     milestone_gump.CenterYInViewPort()
 
@@ -395,10 +509,15 @@ def show_spellweaving_120_milestone():
     milestone_line8.SetRect(15, 334, 910, 28)
     milestone_gump.Add(milestone_line8)
 
-    add_milestone_skill_status(milestone_gump, 940, 370)
+    add_milestone_skill_status(
+        milestone_gump,
+        940,
+        370,
+        [(skill_name, 120) for skill_name, _ in BASE_SKILLS],
+    )
 
     milestone_button = API.Gumps.CreateSimpleButton("Continue", 140, 32)
-    milestone_button.SetPos(400, 435)
+    milestone_button.SetPos(400, 450)
     milestone_button.SetBackgroundColor(35, 110, 45)
     milestone_gump.Add(milestone_button)
     API.Gumps.AddControlOnClick(milestone_button, acknowledge_milestone)
@@ -424,6 +543,39 @@ safety_notice = {"acknowledged": False}
 
 def acknowledge_safety_notice():
     safety_notice["acknowledged"] = True
+
+title_gump = API.Gumps.CreateGump(False, False, False)
+viewport = API.GetViewportBounds()
+title_gump.SetRect(
+    viewport.X + (viewport.Width - 700) // 2,
+    viewport.Y + 15,
+    700,
+    90,
+)
+add_popup_background(title_gump, 700, 90)
+
+title_label = centered_label("Pure Summoner Trainer", 23, "#FFFFFF")
+title_label.SetRect(10, 8, 680, 32)
+title_gump.Add(title_label)
+
+version_label = API.Gumps.CreateGumpTTFLabel(
+    "Version " + VERSION,
+    16,
+    "#FFFFFF",
+    aligned="left",
+)
+version_label.SetRect(18, 52, 300, 24)
+title_gump.Add(version_label)
+
+author_label = API.Gumps.CreateGumpTTFLabel(
+    "Written by Oruchi",
+    16,
+    "#FFFFFF",
+    aligned="right",
+)
+author_label.SetRect(382, 52, 300, 24)
+title_gump.Add(author_label)
+API.Gumps.AddGump(title_gump)
 
 safety_gump = API.Gumps.CreateGump(True, True, False)
 safety_gump.SetRect(0, 0, 850, 250)
@@ -475,6 +627,7 @@ while not safety_notice["acknowledged"] and not API.StopRequested:
     API.Pause(0.1)
 
 safety_gump.Dispose()
+title_gump.Dispose()
 # Ask which Magery goal to use when the script starts.
 goal_selection = {"value": None}
 
@@ -678,7 +831,9 @@ while not API.StopRequested:
         spell_to_cast = "Earthquake"
 
     MIN_MANA = SPELL_MIN_MANA[spell_to_cast]
-    if API.Player.Mana < MIN_MANA:
+    if heal_if_needed():
+        pass
+    elif API.Player.Mana < MIN_MANA:
         wait_for_full_mana()
     else:
         API.PreTarget(API.Player.Serial, "harmful")
@@ -746,6 +901,10 @@ if magery_goal_reached and not API.StopRequested:
 # Train Evaluating Intelligence with Reactive Armor after Magery reaches the selected goal.
 if magery_goal_reached and not API.StopRequested:
     while not API.StopRequested:
+        if heal_if_needed():
+            API.Pause(CHECK_INTERVAL)
+            continue
+
         eval_int = API.GetSkill("Evaluating Intelligence")
 
         if not eval_int:
@@ -806,7 +965,7 @@ if magery_goal_reached and not API.StopRequested:
             completion_gump.Dispose()
             break
 
-        if API.Player.Mana < 4:
+        if API.Player.Mana <= 4:
             wait_for_full_mana()
         else:
             API.CastSpell("Reactive Armor")
@@ -908,19 +1067,7 @@ if magery_goal_reached and not API.StopRequested:
                 min_mana = 50
                 target_type = None
 
-            if API.Player.Hits * 100 < API.Player.HitsMax * 75:
-                greater_heal_mana = 11
-                if API.Player.Mana < greater_heal_mana:
-                    wait_for_full_mana()
-                else:
-                    API.PreTarget(API.Player.Serial, "beneficial")
-                    API.CastSpell("Greater Heal")
-
-                    if API.WaitForTarget("any", timeout=TARGET_TIMEOUT):
-                        API.TargetSelf()
-                    else:
-                        API.CancelPreTarget()
-
+            if heal_if_needed():
                 API.Pause(CHECK_INTERVAL)
                 continue
 
@@ -1170,7 +1317,10 @@ if mysticism_goal_reached and not API.StopRequested:
                     break
 
                 # Arcane Circle costs 24 mana on UOAlive.
-                if API.Player.Mana < 24:
+                if heal_if_needed():
+                    API.Pause(CHECK_INTERVAL)
+                    continue
+                elif API.Player.Mana < 24:
                     wait_for_full_mana()
                 else:
                     API.CastSpell("Arcane Circle")
@@ -1231,7 +1381,10 @@ if mysticism_goal_reached and not API.StopRequested:
                         break
 
                     # Immolating Weapon costs 32 mana on UOAlive.
-                    if API.Player.Mana < 32:
+                    if heal_if_needed():
+                        API.Pause(CHECK_INTERVAL)
+                        continue
+                    elif API.Player.Mana < 32:
                         wait_for_full_mana()
                     else:
                         API.CastSpell("Immolating Weapon")
@@ -1275,16 +1428,15 @@ if mysticism_goal_reached and not API.StopRequested:
                         )
                         break
 
-                    if API.Player.Hits * 100 < API.Player.HitsMax * 75:
-                        if API.Player.Mana < 11:
-                            wait_for_full_mana()
-                        else:
-                            cast_on_self("Greater Heal", "beneficial")
+                    if heal_if_needed():
+                        API.Pause(CHECK_INTERVAL)
+                        continue
                     elif API.Player.Mana < 10:
                         wait_for_full_mana()
                     else:
                         existing_serials = set(
-                            mobile.Serial for mobile in API.GetAllMobiles()
+                            mobile.Serial
+                            for mobile in API.GetAllMobiles()
                         )
                         API.CastSpell("Summon Fey")
                         API.Pause(0.5)
@@ -1292,7 +1444,10 @@ if mysticism_goal_reached and not API.StopRequested:
                         new_fey = []
                         for _ in range(10):
                             new_fey = []
-                            for mobile in API.GetAllMobiles():
+                            for mobile in API.GetAllMobiles(
+                                distance=1,
+                                isGhost=False,
+                            ):
                                 if (
                                     mobile.Serial not in existing_serials
                                     and mobile.Distance <= 1
@@ -1304,7 +1459,31 @@ if mysticism_goal_reached and not API.StopRequested:
                             API.Pause(0.2)
 
                         for summon in new_fey:
-                            API.ContextMenu(summon.Serial, "Release")
+                            if API.StopRequested:
+                                break
+
+                            current_summon = API.FindMobile(summon.Serial)
+                            if not current_summon:
+                                continue
+
+                            release_sent = API.ContextMenu(
+                                current_summon.Serial,
+                                "Release",
+                            )
+                            if not release_sent:
+                                API.Pause(0.5)
+                                release_sent = API.ContextMenu(
+                                    current_summon.Serial,
+                                    "Release",
+                                )
+
+                            if not release_sent:
+                                API.SysMsg(
+                                    "Could not find Release for summoned Fey "
+                                    + "serial "
+                                    + str(current_summon.Serial)
+                                    + "."
+                                )
                             API.Pause(0.5)
 
                     API.Pause(CHECK_INTERVAL)
@@ -1344,5 +1523,4 @@ if mysticism_goal_reached and not API.StopRequested:
                     "Word of Death",
                     50,
                     target_self=True,
-                    heal_below_75=True,
                 )
